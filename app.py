@@ -250,24 +250,63 @@ class HTML5ToVideoConverter:
 
             frame_time_s = 1.0 / config.fps
 
+            # Determine capture method based on first frame test
+            use_element_screenshot = False
+
             for frame_num in range(total_frames):
                 if self.cancelled:
                     driver.quit()
                     return None
 
                 frame_path = os.path.join(frames_dir, f"frame_{frame_num:06d}.png")
-                driver.save_screenshot(frame_path)
 
-                # Verify first frame dimensions
+                # First frame: test which method works
                 if frame_num == 0:
+                    # Try regular screenshot first
+                    driver.save_screenshot(frame_path)
+
                     from PIL import Image
                     with Image.open(frame_path) as img:
                         captured_w, captured_h = img.size
-                        if captured_w != actual_width or captured_h != actual_height:
-                            st.error(f"❌ Screenshot size mismatch!")
-                            st.error(f"Expected: {actual_width}x{actual_height}")
-                            st.error(f"Captured: {captured_w}x{captured_h}")
-                            st.warning("⚠️ Browser may not be capturing full content. Continuing anyway...")
+
+                    if captured_w != actual_width or captured_h != actual_height:
+                        st.warning(f"❌ Regular screenshot failed: {captured_w}x{captured_h} (expected {actual_width}x{actual_height})")
+                        st.info("🔄 Switching to element-based capture...")
+
+                        # Try body element screenshot
+                        try:
+                            body_element = driver.find_element("tag name", "body")
+                            body_screenshot = body_element.screenshot_as_png
+                            with open(frame_path, 'wb') as f:
+                                f.write(body_screenshot)
+
+                            # Check if this worked
+                            with Image.open(frame_path) as img:
+                                captured_w, captured_h = img.size
+                                if captured_w == actual_width and captured_h == actual_height:
+                                    st.success(f"✅ Element capture works: {captured_w}x{captured_h}")
+                                    use_element_screenshot = True
+                                else:
+                                    st.error(f"❌ Element capture also wrong: {captured_w}x{captured_h}")
+                                    st.warning("⚠️ Continuing with best available method...")
+                        except Exception as e:
+                            st.error(f"❌ Element capture failed: {e}")
+                            st.warning("⚠️ Using regular screenshots despite size mismatch")
+                    else:
+                        st.success(f"✅ Screenshot size correct: {captured_w}x{captured_h}")
+
+                else:
+                    # Use determined method for remaining frames
+                    if use_element_screenshot:
+                        try:
+                            body_element = driver.find_element("tag name", "body")
+                            body_screenshot = body_element.screenshot_as_png
+                            with open(frame_path, 'wb') as f:
+                                f.write(body_screenshot)
+                        except:
+                            driver.save_screenshot(frame_path)
+                    else:
+                        driver.save_screenshot(frame_path)
 
                 progress = (frame_num + 1) / total_frames
                 progress_bar.progress(progress)
