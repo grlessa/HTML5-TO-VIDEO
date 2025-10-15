@@ -1,183 +1,83 @@
-# 🎬 HTML5 to Video Converter
+# HTML5 to Video Converter
 
-A professional-grade web application that converts HTML5 content (animations, banners, ads) into high-quality video files with automatic parameter detection.
+Convert HTML5 ads and animations to video files. Simple web interface, automatic settings detection.
 
-![Dark Mode Orange Theme](https://img.shields.io/badge/Theme-Dark%20Orange-ff8c42?style=for-the-badge)
-![Python](https://img.shields.io/badge/Python-3.9+-blue?style=for-the-badge&logo=python)
-![Streamlit](https://img.shields.io/badge/Streamlit-1.31+-red?style=for-the-badge&logo=streamlit)
+## What it does
 
-## ✨ Features
+Takes a ZIP file with HTML5 content and converts it to an MP4 video. Useful for turning banner ads into video ads or previewing animations.
 
-- 🤖 **Auto-Detection**: Automatically detects resolution, FPS, and duration from HTML5 content
-- 🎨 **Dark Mode UI**: Beautiful dark theme with orange accents
-- 🎯 **One-Click Conversion**: Upload ZIP → Click Convert → Download Video
-- ⚙️ **Manual Override**: Full control over all encoding parameters when needed
-- 🎬 **Professional Quality**: Uses Selenium + FFmpeg for production-grade output
-- 📦 **Multiple Codecs**: H.264, H.265, VP9, and ProRes support
-- 🚀 **Cloud Ready**: Deploy to Streamlit Cloud in minutes
+## Quick start
 
-## 🚀 Quick Start
+**Online (easiest):**
+1. Go to the deployed app (Streamlit Cloud link here)
+2. Upload your HTML5 ZIP file
+3. Click convert
+4. Download the video
 
-### Local Installation
+**Local:**
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/html5-to-video.git
-   cd html5-to-video
-   ```
+You'll need FFmpeg and Chrome installed.
 
-2. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+## How it works
 
-3. **Install system requirements**
-   - **FFmpeg**: `brew install ffmpeg` (macOS) or `apt install ffmpeg` (Linux)
-   - **Chrome/Chromium**: Download from [google.com/chrome](https://www.google.com/chrome/)
+**Auto mode** (recommended):
+- Detects resolution from your HTML
+- Figures out duration from animations
+- Sets frame rate based on content
+- Just upload and click convert
 
-4. **Run the app**
-   ```bash
-   streamlit run app.py
-   ```
+**Manual mode**:
+- Set your own resolution, FPS, duration
+- Adjust quality settings if needed
+- Useful if auto-detection gets it wrong
 
-5. **Open in browser**
-   ```
-   http://localhost:8501
-   ```
+## Output settings
 
-## ☁️ Deploy to Streamlit Cloud
+The default settings work well for most cases:
+- H.264 codec (compatible everywhere)
+- CRF 18 (high quality)
+- "slow" preset (good quality/speed balance)
 
-1. **Fork this repository** to your GitHub account
+These are optimized for web video players and downloads.
 
-2. **Go to [Streamlit Cloud](https://streamlit.io/cloud)**
+## About animations
 
-3. **Click "New app"** and select:
-   - Repository: `yourusername/html5-to-video`
-   - Branch: `main`
-   - Main file: `app.py`
+**If your HTML has CSS @keyframes or JavaScript animations:**
+The video will capture them playing.
 
-4. **Click "Deploy"** - That's it! 🎉
+**If your HTML only has hover effects:**
+The video will be static (just the initial state). This is normal - hover effects don't have a timeline to capture.
 
-The app will automatically install all dependencies listed in `requirements.txt` and `packages.txt`.
+## Requirements
 
-## 📖 How to Use
-
-### Auto Mode (Recommended)
-
-1. **Upload** your HTML5 ZIP file (must contain HTML, CSS, JS, images, etc.)
-2. The app automatically detects:
-   - Resolution (width/height)
-   - FPS (based on animation complexity)
-   - Duration (from animation timing)
-3. **Click "Convert to Video"**
-4. **Download** your video when complete
-
-### Manual Mode
-
-1. Switch to **Manual** mode in the sidebar
-2. Configure all settings:
-   - Resolution (width/height)
-   - FPS (1-120)
-   - Duration (seconds)
-   - Codec (H.264, H.265, VP9, ProRes)
-   - Preset (speed vs quality)
-   - CRF (quality level)
-   - Bitrate
-3. **Click "Convert to Video"**
-4. **Download** your video
-
-## 🎨 Supported Formats
-
-### Input
-- ZIP files containing HTML5 content
-- Must include at least one `.html` file
-- Can include CSS, JavaScript, images, fonts, etc.
-
-### Output
-- MP4 (H.264) - Default, widely compatible
-- MP4 (H.265) - Better compression
-- WebM (VP9) - Web-optimized
-- MOV (ProRes) - Professional editing
-
-## ⚙️ Configuration
-
-### Quality Presets
-
-| Preset | Speed | Quality | Use Case |
-|--------|-------|---------|----------|
-| `slow` | ⭐⭐ | ⭐⭐⭐⭐⭐ | Best quality (default) |
-| `medium` | ⭐⭐⭐ | ⭐⭐⭐⭐ | Balanced |
-| `fast` | ⭐⭐⭐⭐ | ⭐⭐⭐ | Quick previews |
-
-### CRF Values
-
-- **0-18**: High quality (large files)
-- **18-23**: Good quality (recommended)
-- **24-51**: Lower quality (smaller files)
-
-## 🛠️ Technology Stack
-
-- **Streamlit**: Web UI framework
-- **Selenium**: HTML5 rendering engine
-- **FFmpeg**: Video encoding
-- **Python**: Backend logic
-
-## 📋 Requirements
-
-### System Requirements
 - Python 3.9+
-- FFmpeg
-- Chrome/Chromium browser
+- FFmpeg (`brew install ffmpeg`)
+- Chrome or Chromium browser
+- Streamlit and Selenium (in requirements.txt)
 
-### Python Dependencies
-- streamlit >= 1.31.0
-- selenium >= 4.15.0
-- Pillow >= 10.0.0
+## Troubleshooting
 
-## 🐛 Troubleshooting
+**"Browser not found":**
+Install Chrome or Chromium.
 
-### "Browser not found" error
-- Install Chrome: `brew install --cask google-chrome`
-- Or use Chromium: `brew install chromium`
+**"FFmpeg not found":**
+Install FFmpeg with your package manager.
 
-### "FFmpeg not found" error
-- Install FFmpeg: `brew install ffmpeg` (macOS)
-- Or: `apt install ffmpeg` (Linux)
+**Video preview doesn't play:**
+Download it instead - some browsers have issues with inline video.
 
-### Upload size limit
-- Streamlit Cloud: Max 200MB per file
-- Local: Configurable in `.streamlit/config.toml`
+## Deploy to Streamlit Cloud
 
-## 📝 License
+1. Fork this repo
+2. Connect it to Streamlit Cloud
+3. Deploy with `app.py`
 
-MIT License - feel free to use for personal or commercial projects.
+It'll install everything automatically from requirements.txt and packages.txt.
 
-## 🤝 Contributing
+## License
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 💡 Use Cases
-
-- Convert HTML5 banner ads to video ads
-- Archive animated web content
-- Create video previews of web animations
-- Convert interactive HTML5 content to video presentations
-- Generate video from HTML5 email templates
-
-## 🌟 Star History
-
-If you find this project useful, please consider giving it a star! ⭐
-
-## 📧 Support
-
-For issues, questions, or suggestions, please [open an issue](https://github.com/yourusername/html5-to-video/issues).
-
----
-
-Made with ❤️ by [Your Name]
+MIT - use it however you want.
