@@ -825,10 +825,6 @@ def main():
                 status_text.success("✅ Complete!")
 
                 if success and os.path.exists(output_file.name):
-                    st.balloons()
-                    st.success("🎉 Video conversion complete!")
-                    st.markdown("Your video is ready. Check the preview on the right →")
-
                     # Update right column with video preview and download
                     with open(output_file.name, 'rb') as f:
                         video_bytes = f.read()
