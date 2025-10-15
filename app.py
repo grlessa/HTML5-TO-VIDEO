@@ -159,7 +159,14 @@ class HTML5ToVideoConverter:
         viewport_width = config.width if config.width % 2 == 0 else config.width + 1
         viewport_height = config.height if config.height % 2 == 0 else config.height + 1
 
-        st.info(f"🖥️ Browser viewport: {viewport_width}x{viewport_height}")
+        st.info(f"🖥️ Target dimensions: {viewport_width}x{viewport_height}")
+
+        # Chromium has a minimum viewport height in headless mode (~400px typically)
+        # We'll use a larger window and scale the content
+        browser_width = max(viewport_width, 800)
+        browser_height = max(viewport_height, 600)
+
+        st.info(f"📱 Browser window: {browser_width}x{browser_height} (minimum required)")
 
         chrome_options = Options()
         chrome_options.add_argument("--headless")  # Use old headless mode for better compatibility
@@ -167,11 +174,12 @@ class HTML5ToVideoConverter:
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--disable-software-rasterizer")
-        chrome_options.add_argument(f"--window-size={viewport_width},{viewport_height}")
+        chrome_options.add_argument(f"--window-size={browser_width},{browser_height}")
         chrome_options.add_argument("--force-device-scale-factor=1")
         chrome_options.add_argument("--hide-scrollbars")
         chrome_options.add_argument("--disable-infobars")
         chrome_options.add_argument("--start-maximized")
+        chrome_options.add_argument("--force-viewport-dimensions")
 
         # Detect browser binary location
         browser_paths = [
@@ -198,25 +206,16 @@ class HTML5ToVideoConverter:
             return None
 
         try:
-            driver.set_window_size(viewport_width, viewport_height)
+            driver.set_window_size(browser_width, browser_height)
             file_url = f"file://{html_path}"
             driver.get(file_url)
             time.sleep(1)
 
-            # Get actual rendered content size (for info only)
-            body_width = driver.execute_script("return Math.max(document.body.scrollWidth, document.documentElement.scrollWidth, document.body.offsetWidth, document.documentElement.offsetWidth, document.body.clientWidth, document.documentElement.clientWidth);")
-            body_height = driver.execute_script("return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.documentElement.offsetHeight, document.body.clientHeight, document.documentElement.clientHeight);")
-            st.info(f"📄 Browser-rendered size: {body_width}x{body_height}")
-
-            # IMPORTANT: Use the config dimensions (from auto-detect), NOT browser's measurement
-            # The browser might add margins/chrome that we don't want
+            # Our target dimensions
             actual_width = viewport_width
             actual_height = viewport_height
 
-            if body_width != viewport_width or body_height != viewport_height:
-                st.warning(f"⚠️ Browser size differs from detected! Using detected: {actual_width}x{actual_height}")
-            else:
-                st.success(f"✅ Browser size matches detected: {actual_width}x{actual_height}")
+            st.info(f"🎯 Will capture at: {actual_width}x{actual_height}")
 
             # Force body AND html to be exactly the size we want
             driver.execute_script(f"""
@@ -260,53 +259,38 @@ class HTML5ToVideoConverter:
 
                 frame_path = os.path.join(frames_dir, f"frame_{frame_num:06d}.png")
 
-                # First frame: test which method works
-                if frame_num == 0:
-                    # Try regular screenshot first
-                    driver.save_screenshot(frame_path)
+                # Take screenshot and crop to exact size
+                temp_path = frame_path + ".tmp.png"
+                driver.save_screenshot(temp_path)
 
-                    from PIL import Image
-                    with Image.open(frame_path) as img:
-                        captured_w, captured_h = img.size
-
-                    if captured_w != actual_width or captured_h != actual_height:
-                        st.warning(f"❌ Regular screenshot failed: {captured_w}x{captured_h} (expected {actual_width}x{actual_height})")
-                        st.info("🔄 Switching to element-based capture...")
-
-                        # Try body element screenshot
-                        try:
-                            body_element = driver.find_element("tag name", "body")
-                            body_screenshot = body_element.screenshot_as_png
-                            with open(frame_path, 'wb') as f:
-                                f.write(body_screenshot)
-
-                            # Check if this worked
-                            with Image.open(frame_path) as img:
-                                captured_w, captured_h = img.size
-                                if captured_w == actual_width and captured_h == actual_height:
-                                    st.success(f"✅ Element capture works: {captured_w}x{captured_h}")
-                                    use_element_screenshot = True
-                                else:
-                                    st.error(f"❌ Element capture also wrong: {captured_w}x{captured_h}")
-                                    st.warning("⚠️ Continuing with best available method...")
-                        except Exception as e:
-                            st.error(f"❌ Element capture failed: {e}")
-                            st.warning("⚠️ Using regular screenshots despite size mismatch")
+                # Crop/resize to exact dimensions using PIL
+                from PIL import Image
+                with Image.open(temp_path) as img:
+                    # If screenshot is larger, crop to top-left corner
+                    if img.size[0] >= actual_width and img.size[1] >= actual_height:
+                        cropped = img.crop((0, 0, actual_width, actual_height))
+                        cropped.save(frame_path)
+                        if frame_num == 0:
+                            st.success(f"✅ Cropping {img.size[0]}x{img.size[1]} to {actual_width}x{actual_height}")
+                    # If screenshot is exact size, just copy
+                    elif img.size[0] == actual_width and img.size[1] == actual_height:
+                        img.save(frame_path)
+                        if frame_num == 0:
+                            st.success(f"✅ Perfect size: {actual_width}x{actual_height}")
+                    # If screenshot is smaller, we have a problem
                     else:
-                        st.success(f"✅ Screenshot size correct: {captured_w}x{captured_h}")
+                        # Resize to target dimensions
+                        resized = img.resize((actual_width, actual_height), Image.Resampling.LANCZOS)
+                        resized.save(frame_path)
+                        if frame_num == 0:
+                            st.warning(f"⚠️ Resizing {img.size[0]}x{img.size[1]} to {actual_width}x{actual_height}")
 
-                else:
-                    # Use determined method for remaining frames
-                    if use_element_screenshot:
-                        try:
-                            body_element = driver.find_element("tag name", "body")
-                            body_screenshot = body_element.screenshot_as_png
-                            with open(frame_path, 'wb') as f:
-                                f.write(body_screenshot)
-                        except:
-                            driver.save_screenshot(frame_path)
-                    else:
-                        driver.save_screenshot(frame_path)
+                # Clean up temp file
+                import os as os_module
+                try:
+                    os_module.remove(temp_path)
+                except:
+                    pass
 
                 progress = (frame_num + 1) / total_frames
                 progress_bar.progress(progress)
