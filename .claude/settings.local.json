@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod:*)",
+      "Bash(ffmpeg:*)",
+      "Bash(pip3 uninstall:*)",
+      "Bash(pip3 install:*)",
+      "Bash(python3:*)",
+      "Bash(sw_vers)",
+      "Read(//Applications/**)",
+      "Bash(awk:*)",
+      "Bash(xargs kill:*)",
+      "Bash(curl:*)",
+      "Bash(zip:*)",
+      "Bash(tree:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
