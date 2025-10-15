@@ -185,6 +185,8 @@ class HTML5ToVideoConverter:
 
     def render_html_to_frames(self, html_path: str, output_dir: str, config: VideoConfig) -> Optional[str]:
         """Render HTML to frames with guaranteed correct dimensions"""
+        from PIL import Image
+
         self.update_progress(0.2, "Loading browser...")
 
         frames_dir = os.path.join(output_dir, "frames")
