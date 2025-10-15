@@ -994,12 +994,12 @@ def main():
                     st.caption("↑ Complete process log (copy entire log)")
 
                 if success and os.path.exists(output_file.name):
-                    # Update right column with video preview and download
+                    # Read video bytes for download
                     with open(output_file.name, 'rb') as f:
                         video_bytes = f.read()
 
-                    # Show video in preview area
-                    preview_placeholder.video(video_bytes)
+                    # Show video in preview area - pass file path directly
+                    preview_placeholder.video(output_file.name)
 
                     download_placeholder.download_button(
                         label="Download Video",
@@ -1008,9 +1008,6 @@ def main():
                         mime="video/mp4",
                         use_container_width=True
                     )
-
-                    # Note: Don't delete output_file.name yet - video player needs it
-                    # Streamlit will clean up temp files when session ends
 
             # Cleanup zip
             try:
