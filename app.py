@@ -275,7 +275,7 @@ class HTML5ToVideoConverter:
                     return None
 
                 frame_path = os.path.join(frames_dir, f"frame_{frame_num:06d}.png")
-                temp_screenshot = frame_path + ".tmp"
+                temp_screenshot = frame_path + ".tmp.png"
 
                 # Take screenshot
                 driver.save_screenshot(temp_screenshot)
@@ -729,7 +729,7 @@ def main():
 
         # Simple settings toggle
         mode = st.radio(
-            "",
+            "Mode",
             ["Auto", "Manual"],
             horizontal=True,
             label_visibility="collapsed"
