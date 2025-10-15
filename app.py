@@ -994,12 +994,20 @@ def main():
                     st.caption("↑ Complete process log (copy entire log)")
 
                 if success and os.path.exists(output_file.name):
-                    # Read video bytes for download
+                    # Read video bytes
                     with open(output_file.name, 'rb') as f:
                         video_bytes = f.read()
 
-                    # Show video in preview area - pass file path directly
-                    preview_placeholder.video(output_file.name)
+                    # Try showing video using HTML5 video tag with base64
+                    import base64
+                    video_base64 = base64.b64encode(video_bytes).decode()
+                    video_html = f"""
+                    <video width="100%" controls>
+                        <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    """
+                    preview_placeholder.markdown(video_html, unsafe_allow_html=True)
 
                     download_placeholder.download_button(
                         label="Download Video",
