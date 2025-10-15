@@ -892,13 +892,12 @@ def main():
 
     # Right column: Preview area (placeholder initially)
     with right_col:
-        st.markdown("### Preview")
-        preview_placeholder = st.empty()
-        download_placeholder = st.empty()
-
-        # Show initial message if no file uploaded
-        if not uploaded_file:
+        preview_container = st.container()
+        with preview_container:
+            st.markdown("### Preview")
+            preview_placeholder = st.empty()
             preview_placeholder.info("Upload a file to see the preview here")
+            download_placeholder = st.empty()
 
     # Continue with left column for conversion process
     with left_col:
