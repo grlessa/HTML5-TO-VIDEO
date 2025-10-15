@@ -375,10 +375,34 @@ class HTML5ToVideoConverter:
                     driver.quit()
                     return None
 
+                # IMPORTANT: Let browser process animations BEFORE taking screenshot
+                if frame_num > 0:
+                    # Wait for animations to update
+                    time.sleep(frame_time_s)
+
+                    # Force browser to process animation frame
+                    driver.execute_script("""
+                        // Force reflow/repaint
+                        document.body.offsetHeight;
+
+                        // Trigger animation frame
+                        if (window.requestAnimationFrame) {
+                            var done = false;
+                            window.requestAnimationFrame(function() {
+                                done = true;
+                            });
+                            // Wait for RAF to complete (synchronous)
+                            var start = Date.now();
+                            while (!done && Date.now() - start < 100) {
+                                // Spin wait
+                            }
+                        }
+                    """)
+
                 frame_path = os.path.join(frames_dir, f"frame_{frame_num:06d}.png")
                 temp_screenshot = frame_path + ".tmp.png"
 
-                # Take screenshot
+                # Take screenshot AFTER waiting
                 if frame_num == 0 or frame_num % 10 == 0 or frame_num == total_frames - 1:
                     self.log(f"Capturing frame {frame_num + 1}/{total_frames}")
                 driver.save_screenshot(temp_screenshot)
@@ -441,27 +465,6 @@ class HTML5ToVideoConverter:
 
                 if frame_num == 0 or frame_num % 10 == 0 or frame_num == total_frames - 1:
                     self.log(f"Frame {frame_num + 1} saved: {os.path.basename(frame_path)}")
-
-                # Advance animation time for next frame
-                # This simulates time passing and triggers animation updates
-                time_advance_ms = int(frame_time_s * 1000)
-                driver.execute_script(f"""
-                    // Advance animation time
-                    if (window.animationStartTime) {{
-                        window.animationStartTime -= {time_advance_ms};
-                    }}
-
-                    // Trigger requestAnimationFrame callbacks
-                    if (window.requestAnimationFrame) {{
-                        window.requestAnimationFrame(function() {{}});
-                    }}
-
-                    // Dispatch events to trigger updates
-                    window.dispatchEvent(new Event('resize'));
-                    document.dispatchEvent(new Event('DOMContentLoaded'));
-                """)
-
-                time.sleep(frame_time_s)
 
             self.log(f"=== FRAME CAPTURE COMPLETE ===")
             self.log(f"Total frames captured: {total_frames}")
