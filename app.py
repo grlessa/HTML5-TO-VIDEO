@@ -375,29 +375,67 @@ class HTML5ToVideoConverter:
                     driver.quit()
                     return None
 
-                # IMPORTANT: Let browser process animations BEFORE taking screenshot
+                # IMPORTANT: Advance animations BEFORE taking screenshot
                 if frame_num > 0:
-                    # Wait for animations to update
-                    time.sleep(frame_time_s)
+                    # Calculate elapsed time for this frame
+                    elapsed_time = frame_num * frame_time_s
+                    elapsed_ms = int(elapsed_time * 1000)
 
-                    # Force browser to process animation frame
-                    driver.execute_script("""
-                        // Force reflow/repaint
-                        document.body.offsetHeight;
+                    if frame_num % 30 == 0:  # Log every 30 frames
+                        self.log(f"Advancing animation to {elapsed_time:.2f}s (frame {frame_num})")
 
-                        // Trigger animation frame
-                        if (window.requestAnimationFrame) {
-                            var done = false;
-                            window.requestAnimationFrame(function() {
-                                done = true;
-                            });
-                            // Wait for RAF to complete (synchronous)
-                            var start = Date.now();
-                            while (!done && Date.now() - start < 100) {
-                                // Spin wait
-                            }
-                        }
+                    # Advance CSS animations by manipulating animation-delay
+                    driver.execute_script(f"""
+                        var timeOffset = -{elapsed_ms};
+
+                        // Method 1: Manipulate CSS animation time using animation-delay
+                        var styleSheet = document.createElement('style');
+                        styleSheet.innerHTML = `
+                            * {{
+                                animation-delay: ${{timeOffset}}ms !important;
+                                transition-delay: ${{timeOffset}}ms !important;
+                            }}
+                        `;
+                        if (!window.__animStyleSheet) {{
+                            document.head.appendChild(styleSheet);
+                            window.__animStyleSheet = styleSheet;
+                        }} else {{
+                            window.__animStyleSheet.innerHTML = styleSheet.innerHTML;
+                        }}
+
+                        // Method 2: For JavaScript animations, update time reference
+                        if (!window.__originalDateNow) {{
+                            window.__originalDateNow = Date.now;
+                            window.__animationStartTime = Date.now();
+                        }}
+
+                        // Override Date.now() to return offset time
+                        Date.now = function() {{
+                            return window.__animationStartTime + {elapsed_ms};
+                        }};
+
+                        // Override performance.now() similarly
+                        if (window.performance && !window.__originalPerformanceNow) {{
+                            window.__originalPerformanceNow = performance.now.bind(performance);
+                        }}
+                        if (window.performance) {{
+                            performance.now = function() {{
+                                return {elapsed_ms};
+                            }};
+                        }}
+
+                        // Method 3: Trigger animation updates
+                        window.dispatchEvent(new Event('resize'));
+                        document.body.offsetHeight; // Force reflow
+
+                        // Trigger RAF if animation loop exists
+                        if (window.requestAnimationFrame) {{
+                            window.requestAnimationFrame(function() {{}});
+                        }}
                     """)
+
+                    # Give browser time to process the time change
+                    time.sleep(0.05)  # 50ms for browser to update
 
                 frame_path = os.path.join(frames_dir, f"frame_{frame_num:06d}.png")
                 temp_screenshot = frame_path + ".tmp.png"
