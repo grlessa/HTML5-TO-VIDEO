@@ -203,25 +203,20 @@ class HTML5ToVideoConverter:
             driver.get(file_url)
             time.sleep(1)
 
-            # Get actual rendered content size
+            # Get actual rendered content size (for info only)
             body_width = driver.execute_script("return Math.max(document.body.scrollWidth, document.documentElement.scrollWidth, document.body.offsetWidth, document.documentElement.offsetWidth, document.body.clientWidth, document.documentElement.clientWidth);")
             body_height = driver.execute_script("return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.documentElement.offsetHeight, document.body.clientHeight, document.documentElement.clientHeight);")
-            st.info(f"📄 Actual content size: {body_width}x{body_height}")
+            st.info(f"📄 Browser-rendered size: {body_width}x{body_height}")
 
-            # Always use the actual content dimensions
-            actual_width = body_width
-            actual_height = body_height
+            # IMPORTANT: Use the config dimensions (from auto-detect), NOT browser's measurement
+            # The browser might add margins/chrome that we don't want
+            actual_width = viewport_width
+            actual_height = viewport_height
 
-            # Make even for H.264
-            if actual_width % 2 != 0:
-                actual_width += 1
-            if actual_height % 2 != 0:
-                actual_height += 1
-
-            if actual_width != viewport_width or actual_height != viewport_height:
-                st.info(f"📏 Adjusting viewport to content: {actual_width}x{actual_height}")
-                driver.set_window_size(actual_width, actual_height)
-                time.sleep(1)  # Give browser time to resize
+            if body_width != viewport_width or body_height != viewport_height:
+                st.warning(f"⚠️ Browser size differs from detected! Using detected: {actual_width}x{actual_height}")
+            else:
+                st.success(f"✅ Browser size matches detected: {actual_width}x{actual_height}")
 
             # Force body AND html to be exactly the size we want
             driver.execute_script(f"""
