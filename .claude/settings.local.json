@@ -12,7 +12,14 @@
       "Bash(xargs kill:*)",
       "Bash(curl:*)",
       "Bash(zip:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(timeout 10 python3 -m streamlit run app.py --server.port 8501 --server.headless true)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

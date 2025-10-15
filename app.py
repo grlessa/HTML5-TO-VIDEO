@@ -508,14 +508,10 @@ class HTML5ToVideoConverter:
 
         # Add codec-specific settings - keep it SIMPLE for cloud compatibility
         if config.codec in ["libx264", "libx265"]:
-            # Use only CRF (no bitrate constraints that might conflict)
+            # Use CRF for quality control
             ffmpeg_cmd.extend(["-crf", str(config.crf)])
-            # Use faster preset for cloud compatibility
-            if config.preset in ["veryslow", "slower", "slow"]:
-                ffmpeg_cmd.extend(["-preset", "medium"])  # Override slow presets
-                self.log(f"Preset '{config.preset}' overridden to 'medium' for cloud compatibility")
-            else:
-                ffmpeg_cmd.extend(["-preset", config.preset])
+            ffmpeg_cmd.extend(["-preset", config.preset])
+            self.log(f"Using preset: {config.preset}, CRF: {config.crf}")
         elif config.codec == "libvpx-vp9":
             ffmpeg_cmd.extend(["-b:v", config.bitrate])
             ffmpeg_cmd.extend(["-crf", str(config.crf)])
@@ -937,18 +933,18 @@ def main():
                         col1.metric("Resolution", f"{width}x{height}")
                         col2.metric("FPS", fps)
                         col3.metric("Duration", f"{duration}s")
-                        col4.metric("Quality", "Lossless")
+                        col4.metric("Quality", "High")
 
-                        # Use optimal settings for maximum quality
+                        # Use optimal settings for high quality (compatible with st.video)
                         codec = "libx264"
-                        preset = "veryslow"
-                        crf = 0  # Lossless quality
-                        bitrate = "50M"
+                        preset = "slow"
+                        crf = 18  # High quality (compatible with web players)
+                        bitrate = "10M"
 
                     else:
                         st.warning("No HTML files found, using defaults")
                         width, height, fps, duration = 1920, 1080, 60, 10
-                        codec, preset, crf, bitrate = "libx264", "veryslow", 0, "50M"
+                        codec, preset, crf, bitrate = "libx264", "slow", 18, "10M"
 
                     shutil.rmtree(temp_extract)
 
@@ -997,17 +993,10 @@ def main():
                     with open(output_file.name, 'rb') as f:
                         video_bytes = f.read()
 
-                    st.write(f"DEBUG: About to show video, size={len(video_bytes)} bytes")
+                    # Show video preview
+                    preview_placeholder.video(video_bytes)
 
-                    # Try clearing and recreating
-                    preview_placeholder.empty()
-
-                    # Use a container approach
-                    with preview_placeholder.container():
-                        st.video(video_bytes, format="video/mp4")
-
-                    st.write("DEBUG: Called st.video() in container")
-
+                    # Add download button
                     download_placeholder.download_button(
                         label="Download Video",
                         data=video_bytes,
