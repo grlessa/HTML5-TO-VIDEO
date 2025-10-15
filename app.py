@@ -186,7 +186,6 @@ class HTML5ToVideoConverter:
     def render_html_to_frames(self, html_path: str, output_dir: str, config: VideoConfig) -> Optional[str]:
         """Render HTML to frames with guaranteed correct dimensions"""
         self.update_progress(0.2, "Loading browser...")
-        st.info("Initializing browser...")
 
         frames_dir = os.path.join(output_dir, "frames")
         os.makedirs(frames_dir, exist_ok=True)
@@ -244,10 +243,6 @@ class HTML5ToVideoConverter:
             driver = webdriver.Chrome(options=chrome_options)
             self.log("WebDriver created successfully")
         except Exception as e:
-            st.error(f"Browser error: {e}")
-            st.info("Make sure packages.txt includes: chromium, chromium-driver")
-            with st.expander("Show error details"):
-                st.code(str(e), language="text")
             return None
 
         try:
@@ -420,7 +415,6 @@ class HTML5ToVideoConverter:
             self.log(f"Exception message: {str(e)}")
             import traceback
             self.log(f"Traceback:\n{traceback.format_exc()}")
-            st.error(f"Rendering error: {e}")
             try:
                 driver.quit()
                 self.log("Browser closed after error")
@@ -446,7 +440,6 @@ class HTML5ToVideoConverter:
 
         if not frame_files:
             self.log("ERROR: No frames found to encode!")
-            st.error("No frames found to encode!")
             return False
 
         self.log(f"Frame files: {frame_files[0]} ... {frame_files[-1]}")
@@ -585,8 +578,6 @@ class HTML5ToVideoConverter:
                     if line.strip():
                         self.log(line)
 
-                st.error(f"FFmpeg error (exit code {process.returncode})")
-
                 # Try fallback with minimal parameters
                 self.log("=== ATTEMPTING FALLBACK ENCODING ===")
                 self.log("Primary encoding failed, trying fallback with minimal parameters...")
@@ -651,15 +642,12 @@ class HTML5ToVideoConverter:
                     for line in fallback_stderr.strip().split('\n'):
                         if line.strip():
                             self.log(line)
-                    st.error("Fallback encoding also failed")
                     return False
 
         except FileNotFoundError:
             self.log("=== FFMPEG NOT FOUND ===")
             self.log("FileNotFoundError: FFmpeg executable not found in PATH")
             self.log("Please install FFmpeg or check packages.txt on Streamlit Cloud")
-            st.error("FFmpeg not found. Please install FFmpeg.")
-            st.info("On Streamlit Cloud, make sure 'packages.txt' includes 'ffmpeg'")
             return False
         except Exception as e:
             self.log("=== ENCODING EXCEPTION ===")
@@ -667,7 +655,6 @@ class HTML5ToVideoConverter:
             self.log(f"Exception message: {str(e)}")
             import traceback
             self.log(f"Traceback:\n{traceback.format_exc()}")
-            st.error(f"Encoding error: {e}")
             return False
 
     def convert(self, zip_path: str, output_path: str, config: VideoConfig) -> bool:
@@ -714,7 +701,6 @@ class HTML5ToVideoConverter:
             self.log(f"Exception message: {str(e)}")
             import traceback
             self.log(f"Traceback:\n{traceback.format_exc()}")
-            st.error(f"Error: {e}")
             return False
         finally:
             try:
@@ -930,7 +916,7 @@ def main():
 
             # Auto-detect if in auto mode
             if mode == "Auto":
-                with st.spinner("🔍 Analyzing HTML5 content..."):
+                with st.spinner("Analyzing HTML5 content..."):
                     temp_extract = tempfile.mkdtemp()
                     with zipfile.ZipFile(temp_zip.name, 'r') as zip_ref:
                         zip_ref.extractall(temp_extract)
@@ -953,7 +939,7 @@ def main():
                         duration = detected['duration']
                         fps = detected['fps']
 
-                        st.success("Auto-detected settings:")
+                        st.write("**Auto-detected settings:**")
                         col1, col2, col3, col4 = st.columns(4)
                         col1.metric("Resolution", f"{width}x{height}")
                         col2.metric("FPS", fps)
@@ -967,7 +953,7 @@ def main():
                         bitrate = "50M"
 
                     else:
-                        st.warning("⚠️ No HTML files found, using defaults")
+                        st.warning("No HTML files found, using defaults")
                         width, height, fps, duration = 1920, 1080, 60, 10
                         codec, preset, crf, bitrate = "libx264", "veryslow", 0, "50M"
 
