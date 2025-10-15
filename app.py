@@ -831,15 +831,19 @@ def main():
             margin: 20px 0;
         }
 
-        /* Smaller video preview */
+        /* Smaller video preview for sharper low-res content */
         .stVideo {
             max-width: 100%;
         }
 
         .stVideo video {
-            max-height: 300px;
-            width: 100%;
+            max-height: 200px;
+            max-width: 100%;
+            width: auto;
             object-fit: contain;
+            image-rendering: crisp-edges;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: pixelated;
         }
 
         /* Make expander more discrete */
