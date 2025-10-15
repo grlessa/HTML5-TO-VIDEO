@@ -999,10 +999,14 @@ def main():
 
                     st.write(f"DEBUG: About to show video, size={len(video_bytes)} bytes")
 
-                    # Update preview directly
-                    preview_placeholder.video(video_bytes)
+                    # Try clearing and recreating
+                    preview_placeholder.empty()
 
-                    st.write("DEBUG: Called preview_placeholder.video()")
+                    # Use a container approach
+                    with preview_placeholder.container():
+                        st.video(video_bytes, format="video/mp4")
+
+                    st.write("DEBUG: Called st.video() in container")
 
                     download_placeholder.download_button(
                         label="Download Video",
