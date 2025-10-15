@@ -658,6 +658,27 @@ def main():
             border-left: 4px solid #4caf50;
             margin: 20px 0;
         }
+
+        /* Smaller video preview */
+        .stVideo {
+            max-width: 100%;
+        }
+
+        .stVideo video {
+            max-height: 300px;
+            width: 100%;
+            object-fit: contain;
+        }
+
+        /* Make expander more discrete */
+        .streamlit-expanderHeader {
+            font-size: 14px;
+            opacity: 0.7;
+        }
+
+        .streamlit-expanderHeader:hover {
+            opacity: 1;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -785,28 +806,76 @@ def main():
                 crf=crf
             )
 
-            converter = HTML5ToVideoConverter()
+            # Create placeholder for conversion output
+            conversion_container = st.container()
 
-            with st.spinner("🎬 Converting..."):
-                success = converter.convert(temp_zip.name, output_file.name, config)
+            with conversion_container:
+                # Progress area (will be hidden in expander)
+                with st.expander("🔍 Show Conversion Details", expanded=False):
+                    progress_placeholder = st.empty()
+
+                # Simple progress bar
+                main_progress = st.progress(0)
+                status_message = st.empty()
+
+            # Store logs in session state
+            if 'conversion_logs' not in st.session_state:
+                st.session_state.conversion_logs = []
+
+            def log_callback(msg):
+                st.session_state.conversion_logs.append(msg)
+                # Update simple status
+                if "Extracting" in msg:
+                    main_progress.progress(0.1)
+                    status_message.info("📦 Extracting...")
+                elif "Initializing browser" in msg or "Using browser" in msg:
+                    main_progress.progress(0.2)
+                    status_message.info("🌐 Loading browser...")
+                elif "Capturing" in msg and "frames" in msg:
+                    main_progress.progress(0.3)
+                    status_message.info("📸 Capturing frames...")
+                elif "Encoding" in msg:
+                    main_progress.progress(0.7)
+                    status_message.info("🎬 Encoding video...")
+                elif "complete" in msg.lower():
+                    main_progress.progress(1.0)
+                    status_message.success("✅ Conversion complete!")
+
+                # Update detailed log in expander
+                with conversion_container:
+                    with st.expander("🔍 Show Conversion Details", expanded=False):
+                        for log in st.session_state.conversion_logs:
+                            st.text(log)
+
+            converter = HTML5ToVideoConverter(progress_callback=log_callback)
+            success = converter.convert(temp_zip.name, output_file.name, config)
 
             if success and os.path.exists(output_file.name):
                 st.balloons()
 
-                # Download button
-                with open(output_file.name, 'rb') as f:
-                    video_bytes = f.read()
+                # Two-column layout for results
+                result_col1, result_col2 = st.columns([2, 1])
 
-                st.download_button(
-                    label="📥 Download Video",
-                    data=video_bytes,
-                    file_name="converted_video.mp4",
-                    mime="video/mp4",
-                    use_container_width=True
-                )
+                with result_col1:
+                    st.success("🎉 Video conversion complete!")
+                    st.markdown("Your video is ready. Check the preview on the right →")
 
-                # Show video preview
-                st.video(output_file.name)
+                with result_col2:
+                    st.markdown("### Preview")
+                    # Smaller video preview
+                    st.video(output_file.name)
+
+                    # Download button under preview
+                    with open(output_file.name, 'rb') as f:
+                        video_bytes = f.read()
+
+                    st.download_button(
+                        label="📥 Download Video",
+                        data=video_bytes,
+                        file_name="converted_video.mp4",
+                        mime="video/mp4",
+                        use_container_width=True
+                    )
 
                 # Cleanup
                 try:
