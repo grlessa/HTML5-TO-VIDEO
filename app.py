@@ -121,11 +121,24 @@ class HTML5ToVideoConverter:
     def __init__(self, progress_callback=None):
         self.cancelled = False
         self.progress_callback = progress_callback
+        self.debug_log = []  # Collect all debug output
 
     def update_progress(self, value, message=None):
         """Update external progress if callback provided"""
         if self.progress_callback:
             self.progress_callback(value, message)
+
+    def log(self, message):
+        """Add message to debug log"""
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        log_entry = f"[{timestamp}] {message}"
+        self.debug_log.append(log_entry)
+        return log_entry
+
+    def get_debug_output(self):
+        """Get all debug output as terminal-style text"""
+        return "\n".join(self.debug_log)
 
     def extract_zip(self, zip_path: str, extract_dir: str) -> str:
         """Extract and find main HTML file"""
@@ -168,7 +181,9 @@ class HTML5ToVideoConverter:
         target_width = config.width if config.width % 2 == 0 else config.width + 1
         target_height = config.height if config.height % 2 == 0 else config.height + 1
 
-        st.info(f"Target dimensions: {target_width}x{target_height}")
+        self.log(f"=== HTML5 TO VIDEO RENDERING ===")
+        self.log(f"Target dimensions: {target_width}x{target_height} (even-adjusted from {config.width}x{config.height})")
+        self.log(f"Total frames: {total_frames} ({config.fps} FPS × {config.duration}s)")
 
         # Chrome options - REQUIREMENT #1: Set window size in chrome_options
         chrome_options = Options()
@@ -254,21 +269,17 @@ class HTML5ToVideoConverter:
             actual_body_w = driver.execute_script("return document.body.offsetWidth;")
             actual_body_h = driver.execute_script("return document.body.offsetHeight;")
 
-            # Technical dimension analysis (copyable for debugging)
-            dimension_info = f"""
-DIMENSION ANALYSIS
-==================
-Detected from HTML: {config.width}x{config.height}
-Requested (even): {target_width}x{target_height}
-Actual viewport: {actual_viewport_w}x{actual_viewport_h}
-Actual body: {actual_body_w}x{actual_body_h}
-Match: {'YES' if actual_viewport_w == target_width and actual_viewport_h == target_height else 'NO'}
-"""
-            st.code(dimension_info, language="text")
+            # Log dimension analysis
+            self.log(f"=== DIMENSION ANALYSIS ===")
+            self.log(f"Detected from HTML: {config.width}x{config.height}")
+            self.log(f"Requested (even): {target_width}x{target_height}")
+            self.log(f"Actual viewport: {actual_viewport_w}x{actual_viewport_h}")
+            self.log(f"Actual body: {actual_body_w}x{actual_body_h}")
+            match_status = 'YES' if actual_viewport_w == target_width and actual_viewport_h == target_height else 'NO'
+            self.log(f"Dimensions match: {match_status}")
 
-            # Also show as info for quick view
             if actual_viewport_w != target_width or actual_viewport_h != target_height:
-                st.warning(f"⚠️ Viewport mismatch! Expected {target_width}x{target_height}, got {actual_viewport_w}x{actual_viewport_h}")
+                self.log(f"WARNING: Viewport mismatch! Expected {target_width}x{target_height}, got {actual_viewport_w}x{actual_viewport_h}")
 
             # Capture frames
             st.info(f"Capturing {total_frames} frames at {config.fps} FPS...")
@@ -297,37 +308,29 @@ Match: {'YES' if actual_viewport_w == target_width and actual_viewport_h == targ
 
                     # Technical screenshot analysis on first frame
                     if frame_num == 0:
-                        screenshot_info = f"""
-SCREENSHOT ANALYSIS
-===================
-Screenshot size: {screenshot_w}x{screenshot_h}
-Target size: {target_width}x{target_height}
-Width diff: {screenshot_w - target_width:+d}px
-Height diff: {screenshot_h - target_height:+d}px
-"""
+                        self.log(f"=== SCREENSHOT ANALYSIS ===")
+                        self.log(f"Screenshot size: {screenshot_w}x{screenshot_h}")
+                        self.log(f"Target size: {target_width}x{target_height}")
+                        self.log(f"Width diff: {screenshot_w - target_width:+d}px")
+                        self.log(f"Height diff: {screenshot_h - target_height:+d}px")
+
                         # Case 1: Larger or equal - crop it
                         if screenshot_w >= target_width and screenshot_h >= target_height:
-                            screenshot_info += f"Action: CROP from top-left ({screenshot_w}x{screenshot_h} → {target_width}x{target_height})\n"
+                            self.log(f"Action: CROP from top-left ({screenshot_w}x{screenshot_h} → {target_width}x{target_height})")
                             corrected = img.crop((0, 0, target_width, target_height))
                             corrected.save(frame_path)
-                            st.code(screenshot_info, language="text")
-                            st.success(f"✓ Cropped to {target_width}x{target_height}")
 
                         # Case 2: Smaller - resize it
                         elif screenshot_w < target_width or screenshot_h < target_height:
-                            screenshot_info += f"Action: RESIZE with LANCZOS ({screenshot_w}x{screenshot_h} → {target_width}x{target_height})\n"
-                            screenshot_info += "WARNING: Screenshot smaller than expected!\n"
+                            self.log(f"Action: RESIZE with LANCZOS ({screenshot_w}x{screenshot_h} → {target_width}x{target_height})")
+                            self.log(f"WARNING: Screenshot smaller than expected!")
                             corrected = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
                             corrected.save(frame_path)
-                            st.code(screenshot_info, language="text")
-                            st.warning(f"⚠️ Resized from {screenshot_w}x{screenshot_h}")
 
                         # Case 3: Exact match
                         else:
-                            screenshot_info += "Action: EXACT MATCH - no correction needed\n"
+                            self.log(f"Action: EXACT MATCH - no correction needed")
                             img.save(frame_path)
-                            st.code(screenshot_info, language="text")
-                            st.success(f"✓ Perfect: {target_width}x{target_height}")
                     else:
                         # For subsequent frames, just do the correction without logging
                         if screenshot_w >= target_width and screenshot_h >= target_height:
@@ -466,10 +469,10 @@ Height diff: {screenshot_h - target_height:+d}px
         ffmpeg_cmd.append(output_path)
 
         try:
-            # Show FFmpeg command for debugging (copyable)
+            # Log FFmpeg command
             ffmpeg_command_str = " ".join(ffmpeg_cmd)
-            st.code(ffmpeg_command_str, language="bash")
-            st.caption("↑ Full FFmpeg command (copy for debugging)")
+            self.log(f"=== FFMPEG COMMAND ===")
+            self.log(ffmpeg_command_str)
 
             process = subprocess.Popen(
                 ffmpeg_cmd,
@@ -482,10 +485,11 @@ Height diff: {screenshot_h - target_height:+d}px
             stdout, stderr = process.communicate()
 
             if process.returncode == 0:
-                st.success("✅ Video encoding complete!")
-                # Show FFmpeg output for technical debugging
-                with st.expander("FFmpeg output (technical details)"):
-                    st.code(stderr, language="text")
+                self.log(f"=== FFMPEG OUTPUT ===")
+                for line in stderr.strip().split('\n'):
+                    if line.strip():
+                        self.log(line)
+                self.log("Video encoding complete (exit code 0)")
                 return True
             else:
                 # Show detailed error
@@ -868,14 +872,22 @@ def main():
                     if message:
                         status_text.text(message)
 
-                # All detailed output in collapsible debug section
-                with st.expander("Debug Details", expanded=False):
-                    converter = HTML5ToVideoConverter(progress_callback=update_progress)
+                # Run conversion (st.info/success messages hidden in expander)
+                converter = HTML5ToVideoConverter(progress_callback=update_progress)
+
+                # Hide all st messages by running in expander
+                with st.expander("⚠️ Status messages", expanded=False):
                     success = converter.convert(temp_zip.name, output_file.name, config)
 
                 # Complete
                 progress_bar.progress(1.0)
                 status_text.success("Complete")
+
+                # Show terminal-style debug output
+                with st.expander("Debug Details", expanded=False):
+                    debug_output = converter.get_debug_output()
+                    st.code(debug_output, language="text")
+                    st.caption("↑ Raw debug output (copy entire log)")
 
                 if success and os.path.exists(output_file.name):
                     # Update right column with video preview and download
