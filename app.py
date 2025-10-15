@@ -388,6 +388,48 @@ class HTML5ToVideoConverter:
                 if 'CreateJS' in log['message'] or 'GSAP' in log['message'] or 'canvas' in log['message'].lower():
                     self.log(f"Browser console: {log['message']}")
 
+            # Check what CSS animations exist
+            animations_info = driver.execute_script("""
+                var info = {
+                    stylesheets: document.styleSheets.length,
+                    animations: []
+                };
+
+                // Try to find @keyframes rules
+                try {
+                    for (var i = 0; i < document.styleSheets.length; i++) {
+                        var sheet = document.styleSheets[i];
+                        try {
+                            var rules = sheet.cssRules || sheet.rules;
+                            for (var j = 0; j < rules.length; j++) {
+                                if (rules[j].type === CSSRule.KEYFRAMES_RULE) {
+                                    info.animations.push(rules[j].name);
+                                }
+                            }
+                        } catch(e) {
+                            // CORS or access issues
+                        }
+                    }
+                } catch(e) {}
+
+                // Check computed styles on elements
+                var elements = document.querySelectorAll('*');
+                info.animated_elements = 0;
+                for (var i = 0; i < elements.length; i++) {
+                    var style = window.getComputedStyle(elements[i]);
+                    if (style.animationName && style.animationName !== 'none') {
+                        info.animated_elements++;
+                    }
+                }
+
+                return info;
+            """)
+
+            self.log(f"CSS info: {animations_info['stylesheets']} stylesheets, {len(animations_info['animations'])} keyframe animations")
+            if animations_info['animations']:
+                self.log(f"Keyframes found: {', '.join(animations_info['animations'])}")
+            self.log(f"Elements with animations: {animations_info['animated_elements']}")
+
             self.log("Animations triggered")
 
             # Capture frames
