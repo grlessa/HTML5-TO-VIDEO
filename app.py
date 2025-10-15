@@ -892,12 +892,13 @@ def main():
 
     # Right column: Preview area (placeholder initially)
     with right_col:
-        preview_container = st.container()
-        with preview_container:
-            st.markdown("### Preview")
-            preview_placeholder = st.empty()
+        st.markdown("### Preview")
+        preview_placeholder = st.empty()
+        download_placeholder = st.empty()
+
+        # Show initial message if no file uploaded
+        if not uploaded_file:
             preview_placeholder.info("Upload a file to see the preview here")
-            download_placeholder = st.empty()
 
     # Continue with left column for conversion process
     with left_col:
@@ -997,7 +998,10 @@ def main():
                     with open(output_file.name, 'rb') as f:
                         video_bytes = f.read()
 
-                    preview_placeholder.video(video_bytes)
+                    # Clear placeholder and show video
+                    with preview_placeholder.container():
+                        st.video(video_bytes, format="video/mp4", start_time=0)
+
                     download_placeholder.download_button(
                         label="Download Video",
                         data=video_bytes,
