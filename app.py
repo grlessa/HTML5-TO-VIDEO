@@ -998,9 +998,8 @@ def main():
                     with open(output_file.name, 'rb') as f:
                         video_bytes = f.read()
 
-                    # Clear placeholder and show video
-                    with preview_placeholder.container():
-                        st.video(video_bytes, format="video/mp4", start_time=0)
+                    # Show video in preview area
+                    preview_placeholder.video(video_bytes)
 
                     download_placeholder.download_button(
                         label="Download Video",
@@ -1010,11 +1009,8 @@ def main():
                         use_container_width=True
                     )
 
-                    # Cleanup
-                    try:
-                        os.unlink(output_file.name)
-                    except:
-                        pass
+                    # Note: Don't delete output_file.name yet - video player needs it
+                    # Streamlit will clean up temp files when session ends
 
             # Cleanup zip
             try:
