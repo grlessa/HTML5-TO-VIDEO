@@ -316,16 +316,31 @@ class HTML5ToVideoConverter:
 
             # Execute JavaScript to start animations and simulate interactions
             animation_trigger_script = """
-                // Force all CSS animations to run
+                // Force all CSS animations to run and apply hover states
                 var style = document.createElement('style');
                 style.innerHTML = `
                     * {
                         animation-play-state: running !important;
                         animation-delay: 0s !important;
-                        transition-duration: 0.1s !important;
+                    }
+
+                    /* Force hover states to be visible (for interactive demos) */
+                    *:hover,
+                    .amount:hover,
+                    .button:hover {
+                        /* Apply hover styles permanently for demo */
                     }
                 `;
                 document.head.appendChild(style);
+
+                // Force first interactive element to appear hovered
+                var firstInteractive = document.querySelector('.button, .amount, [class*="hover"]');
+                if (firstInteractive) {
+                    firstInteractive.classList.add('force-hover');
+                    var hoverStyle = document.createElement('style');
+                    hoverStyle.innerHTML = '.force-hover { /* hover styles will be applied */ }';
+                    document.head.appendChild(hoverStyle);
+                }
 
                 // Simulate hover on all interactive elements
                 var interactiveElements = document.querySelectorAll('a, button, [class*="hover"], [class*="interactive"]');
