@@ -686,161 +686,160 @@ def main():
     st.markdown('<h1 class="main-title">🎬 HTML5 to Video Converter</h1>', unsafe_allow_html=True)
     st.markdown('<p class="subtitle">Professional conversion with auto-detection and full control</p>', unsafe_allow_html=True)
 
-    # Sidebar for settings
-    with st.sidebar:
+    # Two-column layout from the start
+    left_col, right_col = st.columns([2, 1])
+
+    # Left column: Upload and settings
+    with left_col:
+        # Upload section
+        uploaded_file = st.file_uploader(
+            "📦 Upload your HTML5 ZIP file",
+            type=['zip'],
+            help="ZIP file containing HTML, CSS, JS, images, and all assets"
+        )
+
+        # Settings section
         st.markdown("### ⚙️ Settings")
 
         mode = st.radio(
             "Mode",
             ["🤖 Auto (Recommended)", "🎛️ Manual"],
-            help="Auto mode detects optimal settings from your HTML5 content"
+            help="Auto mode detects optimal settings from your HTML5 content",
+            horizontal=True
         )
 
-        st.markdown("---")
-
         if mode == "🎛️ Manual":
-            st.markdown("### 📐 Video Configuration")
+            with st.expander("📐 Video Configuration", expanded=True):
+                col1, col2 = st.columns(2)
+                with col1:
+                    width = st.number_input("Width (px)", 100, 7680, 1920)
+                    fps = st.number_input("FPS", 1, 120, 60)
+                with col2:
+                    height = st.number_input("Height (px)", 100, 4320, 1080)
+                    duration = st.number_input("Duration (s)", 1, 3600, 10)
 
-            col1, col2 = st.columns(2)
-            with col1:
-                width = st.number_input("Width (px)", 100, 7680, 1920)
-            with col2:
-                height = st.number_input("Height (px)", 100, 4320, 1080)
+            with st.expander("🎨 Quality Settings", expanded=False):
+                codec = st.selectbox(
+                    "Codec",
+                    ["libx264", "libx265", "libvpx-vp9", "prores_ks"],
+                    help="H.264 recommended for compatibility"
+                )
 
-            col1, col2 = st.columns(2)
-            with col1:
-                fps = st.number_input("FPS", 1, 120, 60)
-            with col2:
-                duration = st.number_input("Duration (s)", 1, 3600, 10)
+                preset = st.selectbox(
+                    "Preset",
+                    ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"],
+                    index=6,
+                    help="Slower = better quality"
+                )
 
-            st.markdown("### 🎨 Quality Settings")
+                crf = st.slider("CRF (Quality)", 0, 51, 18, help="Lower = better quality (18 recommended)")
 
-            codec = st.selectbox(
-                "Codec",
-                ["libx264", "libx265", "libvpx-vp9", "prores_ks"],
-                help="H.264 recommended for compatibility"
-            )
+                bitrate = st.text_input("Bitrate", "10M", help="e.g., 5M, 10M, 20M")
 
-            preset = st.selectbox(
-                "Preset",
-                ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"],
-                index=6,
-                help="Slower = better quality"
-            )
+    # Right column: Preview area (placeholder initially)
+    with right_col:
+        preview_container = st.container()
+        with preview_container:
+            st.markdown("### 📹 Preview")
+            preview_placeholder = st.empty()
+            preview_placeholder.info("Upload a file to see the preview here")
+            download_placeholder = st.empty()
 
-            crf = st.slider("CRF (Quality)", 0, 51, 18, help="Lower = better quality (18 recommended)")
+    # Continue with left column for conversion process
+    with left_col:
+        if uploaded_file:
+            # Save uploaded file
+            temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
+            temp_zip.write(uploaded_file.read())
+            temp_zip.close()
 
-            bitrate = st.text_input("Bitrate", "10M", help="e.g., 5M, 10M, 20M")
+            # Auto-detect if in auto mode
+            if mode == "🤖 Auto (Recommended)":
+                with st.spinner("🔍 Analyzing HTML5 content..."):
+                    temp_extract = tempfile.mkdtemp()
+                    with zipfile.ZipFile(temp_zip.name, 'r') as zip_ref:
+                        zip_ref.extractall(temp_extract)
 
-    # Main content
-    uploaded_file = st.file_uploader(
-        "📦 Upload your HTML5 ZIP file",
-        type=['zip'],
-        help="ZIP file containing HTML, CSS, JS, images, and all assets"
-    )
+                    html_files = list(Path(temp_extract).rglob("*.html"))
+                    if html_files:
+                        main_html = None
+                        for html_file in html_files:
+                            if html_file.name.lower() in ['index.html', 'index.htm']:
+                                main_html = html_file
+                                break
+                        if not main_html:
+                            main_html = html_files[0]
 
-    if uploaded_file:
-        # Save uploaded file
-        temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
-        temp_zip.write(uploaded_file.read())
-        temp_zip.close()
+                        analyzer = HTML5Analyzer()
+                        detected = analyzer.analyze_html(str(main_html))
 
-        # Auto-detect if in auto mode
-        if mode == "🤖 Auto (Recommended)":
-            with st.spinner("🔍 Analyzing HTML5 content..."):
-                temp_extract = tempfile.mkdtemp()
-                with zipfile.ZipFile(temp_zip.name, 'r') as zip_ref:
-                    zip_ref.extractall(temp_extract)
+                        width = detected['width']
+                        height = detected['height']
+                        duration = detected['duration']
+                        fps = detected['fps']
 
-                html_files = list(Path(temp_extract).rglob("*.html"))
-                if html_files:
-                    main_html = None
-                    for html_file in html_files:
-                        if html_file.name.lower() in ['index.html', 'index.htm']:
-                            main_html = html_file
-                            break
-                    if not main_html:
-                        main_html = html_files[0]
+                        st.success("✅ Auto-detected settings:")
+                        col1, col2, col3, col4 = st.columns(4)
+                        col1.metric("Resolution", f"{width}x{height}")
+                        col2.metric("FPS", fps)
+                        col3.metric("Duration", f"{duration}s")
+                        col4.metric("Quality", "High (CRF 18)")
 
-                    analyzer = HTML5Analyzer()
-                    detected = analyzer.analyze_html(str(main_html))
+                        # Use optimal settings
+                        codec = "libx264"
+                        preset = "slow"
+                        crf = 18
+                        bitrate = "10M"
 
-                    width = detected['width']
-                    height = detected['height']
-                    duration = detected['duration']
-                    fps = detected['fps']
+                    else:
+                        st.warning("⚠️ No HTML files found, using defaults")
+                        width, height, fps, duration = 1920, 1080, 60, 10
+                        codec, preset, crf, bitrate = "libx264", "slow", 18, "10M"
 
-                    st.success("✅ Auto-detected settings:")
-                    col1, col2, col3, col4 = st.columns(4)
-                    col1.metric("Resolution", f"{width}x{height}")
-                    col2.metric("FPS", fps)
-                    col3.metric("Duration", f"{duration}s")
-                    col4.metric("Quality", "High (CRF 18)")
+                    shutil.rmtree(temp_extract)
 
-                    # Use optimal settings
-                    codec = "libx264"
-                    preset = "slow"
-                    crf = 18
-                    bitrate = "10M"
+            # Convert button
+            if st.button("🚀 Convert to Video", use_container_width=True):
+                output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+                output_file.close()
 
-                else:
-                    st.warning("⚠️ No HTML files found, using defaults")
-                    width, height, fps, duration = 1920, 1080, 60, 10
-                    codec, preset, crf, bitrate = "libx264", "slow", 18, "10M"
+                config = VideoConfig(
+                    width=width,
+                    height=height,
+                    fps=fps,
+                    duration=duration,
+                    codec=codec,
+                    bitrate=bitrate,
+                    preset=preset,
+                    crf=crf
+                )
 
-                shutil.rmtree(temp_extract)
+                # Simple progress indicators
+                main_progress = st.progress(0)
+                status_message = st.empty()
 
-        # Convert button
-        if st.button("🚀 Convert to Video", use_container_width=True):
-            output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-            output_file.close()
+                status_message.info("🎬 Converting video...")
+                main_progress.progress(0.5)
 
-            config = VideoConfig(
-                width=width,
-                height=height,
-                fps=fps,
-                duration=duration,
-                codec=codec,
-                bitrate=bitrate,
-                preset=preset,
-                crf=crf
-            )
+                # All detailed output goes in expander
+                with st.expander("🔍 Show Conversion Details", expanded=False):
+                    converter = HTML5ToVideoConverter()
+                    success = converter.convert(temp_zip.name, output_file.name, config)
 
-            # Simple progress indicators
-            main_progress = st.progress(0)
-            status_message = st.empty()
+                main_progress.progress(1.0)
+                status_message.success("✅ Conversion complete!")
 
-            status_message.info("🎬 Converting video...")
-            main_progress.progress(0.5)
-
-            # All detailed output goes in expander
-            with st.expander("🔍 Show Conversion Details", expanded=False):
-                converter = HTML5ToVideoConverter()
-                success = converter.convert(temp_zip.name, output_file.name, config)
-
-            main_progress.progress(1.0)
-            status_message.success("✅ Conversion complete!")
-
-            if success and os.path.exists(output_file.name):
-                st.balloons()
-
-                # Two-column layout for results
-                result_col1, result_col2 = st.columns([2, 1])
-
-                with result_col1:
+                if success and os.path.exists(output_file.name):
+                    st.balloons()
                     st.success("🎉 Video conversion complete!")
                     st.markdown("Your video is ready. Check the preview on the right →")
 
-                with result_col2:
-                    st.markdown("### Preview")
-                    # Smaller video preview
-                    st.video(output_file.name)
-
-                    # Download button under preview
+                    # Update right column with video preview and download
                     with open(output_file.name, 'rb') as f:
                         video_bytes = f.read()
 
-                    st.download_button(
+                    preview_placeholder.video(video_bytes)
+                    download_placeholder.download_button(
                         label="📥 Download Video",
                         data=video_bytes,
                         file_name="converted_video.mp4",
@@ -848,17 +847,17 @@ def main():
                         use_container_width=True
                     )
 
-                # Cleanup
-                try:
-                    os.unlink(output_file.name)
-                except:
-                    pass
+                    # Cleanup
+                    try:
+                        os.unlink(output_file.name)
+                    except:
+                        pass
 
-        # Cleanup zip
-        try:
-            os.unlink(temp_zip.name)
-        except:
-            pass
+            # Cleanup zip
+            try:
+                os.unlink(temp_zip.name)
+            except:
+                pass
 
     # Footer
     st.markdown("---")
