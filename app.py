@@ -318,9 +318,6 @@ class HTML5ToVideoConverter:
             self.log(f"Time between frames: {frame_time_s:.4f}s")
             self.update_progress(0.3, "Capturing frames...")
 
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-
             for frame_num in range(total_frames):
                 frame_progress = 0.3 + (0.4 * (frame_num + 1) / total_frames)
                 self.update_progress(frame_progress, f"Frame {frame_num + 1}/{total_frames}")
@@ -396,10 +393,6 @@ class HTML5ToVideoConverter:
                 if frame_num == 0 or frame_num % 10 == 0 or frame_num == total_frames - 1:
                     self.log(f"Frame {frame_num + 1} saved: {os.path.basename(frame_path)}")
 
-                progress = (frame_num + 1) / total_frames
-                progress_bar.progress(progress)
-                status_text.text(f"Frame {frame_num + 1}/{total_frames}")
-
                 time.sleep(frame_time_s)
 
             self.log(f"=== FRAME CAPTURE COMPLETE ===")
@@ -408,8 +401,6 @@ class HTML5ToVideoConverter:
 
             driver.quit()
             self.log("Browser closed")
-            progress_bar.empty()
-            status_text.empty()
 
         except Exception as e:
             self.log(f"=== RENDERING ERROR ===")
