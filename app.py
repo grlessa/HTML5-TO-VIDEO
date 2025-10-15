@@ -806,49 +806,20 @@ def main():
                 crf=crf
             )
 
-            # Create placeholder for conversion output
-            conversion_container = st.container()
+            # Simple progress indicators
+            main_progress = st.progress(0)
+            status_message = st.empty()
 
-            with conversion_container:
-                # Progress area (will be hidden in expander)
-                with st.expander("🔍 Show Conversion Details", expanded=False):
-                    progress_placeholder = st.empty()
+            status_message.info("🎬 Converting video...")
+            main_progress.progress(0.5)
 
-                # Simple progress bar
-                main_progress = st.progress(0)
-                status_message = st.empty()
+            # All detailed output goes in expander
+            with st.expander("🔍 Show Conversion Details", expanded=False):
+                converter = HTML5ToVideoConverter()
+                success = converter.convert(temp_zip.name, output_file.name, config)
 
-            # Store logs in session state
-            if 'conversion_logs' not in st.session_state:
-                st.session_state.conversion_logs = []
-
-            def log_callback(msg):
-                st.session_state.conversion_logs.append(msg)
-                # Update simple status
-                if "Extracting" in msg:
-                    main_progress.progress(0.1)
-                    status_message.info("📦 Extracting...")
-                elif "Initializing browser" in msg or "Using browser" in msg:
-                    main_progress.progress(0.2)
-                    status_message.info("🌐 Loading browser...")
-                elif "Capturing" in msg and "frames" in msg:
-                    main_progress.progress(0.3)
-                    status_message.info("📸 Capturing frames...")
-                elif "Encoding" in msg:
-                    main_progress.progress(0.7)
-                    status_message.info("🎬 Encoding video...")
-                elif "complete" in msg.lower():
-                    main_progress.progress(1.0)
-                    status_message.success("✅ Conversion complete!")
-
-                # Update detailed log in expander
-                with conversion_container:
-                    with st.expander("🔍 Show Conversion Details", expanded=False):
-                        for log in st.session_state.conversion_logs:
-                            st.text(log)
-
-            converter = HTML5ToVideoConverter(progress_callback=log_callback)
-            success = converter.convert(temp_zip.name, output_file.name, config)
+            main_progress.progress(1.0)
+            status_message.success("✅ Conversion complete!")
 
             if success and os.path.exists(output_file.name):
                 st.balloons()
