@@ -696,7 +696,7 @@ def main():
     """, unsafe_allow_html=True)
 
     # Header
-    st.markdown('<h1 class="main-title">🎬 HTML5 to Video Converter</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-title">HTML5 to Video Converter</h1>', unsafe_allow_html=True)
 
     # Two-column layout from the start
     left_col, right_col = st.columns([2, 1])
@@ -705,7 +705,7 @@ def main():
     with left_col:
         # Upload section
         uploaded_file = st.file_uploader(
-            "📦 Upload your HTML5 ZIP file",
+            "Upload HTML5 ZIP file",
             type=['zip'],
             help="ZIP file containing HTML, CSS, JS, images, and all assets"
         )
@@ -731,7 +731,7 @@ def main():
     with right_col:
         preview_container = st.container()
         with preview_container:
-            st.markdown("### 📹 Preview")
+            st.markdown("### Preview")
             preview_placeholder = st.empty()
             preview_placeholder.info("Upload a file to see the preview here")
             download_placeholder = st.empty()
@@ -769,7 +769,7 @@ def main():
                         duration = detected['duration']
                         fps = detected['fps']
 
-                        st.success("✅ Auto-detected settings:")
+                        st.success("Auto-detected settings:")
                         col1, col2, col3, col4 = st.columns(4)
                         col1.metric("Resolution", f"{width}x{height}")
                         col2.metric("FPS", fps)
@@ -790,7 +790,7 @@ def main():
                     shutil.rmtree(temp_extract)
 
             # Convert button
-            if st.button("🚀 Convert to Video", use_container_width=True):
+            if st.button("Convert to Video", use_container_width=True):
                 output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
                 output_file.close()
 
@@ -816,13 +816,13 @@ def main():
                         status_text.text(message)
 
                 # All detailed output in collapsible debug section
-                with st.expander("🔍 Debug Details", expanded=False):
+                with st.expander("Debug Details", expanded=False):
                     converter = HTML5ToVideoConverter(progress_callback=update_progress)
                     success = converter.convert(temp_zip.name, output_file.name, config)
 
                 # Complete
                 progress_bar.progress(1.0)
-                status_text.success("✅ Complete!")
+                status_text.success("Complete")
 
                 if success and os.path.exists(output_file.name):
                     # Update right column with video preview and download
@@ -831,7 +831,7 @@ def main():
 
                     preview_placeholder.video(video_bytes)
                     download_placeholder.download_button(
-                        label="📥 Download Video",
+                        label="Download Video",
                         data=video_bytes,
                         file_name="converted_video.mp4",
                         mime="video/mp4",
