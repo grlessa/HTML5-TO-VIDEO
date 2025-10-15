@@ -154,48 +154,44 @@ class HTML5ToVideoConverter:
         return str(main_html.absolute())
 
     def render_html_to_frames(self, html_path: str, output_dir: str, config: VideoConfig) -> Optional[str]:
-        """Render HTML to frames using Selenium"""
-        self.update_progress(0.2, "🌐 Loading browser...")
-        st.info("🎬 Initializing browser...")
+        """Render HTML to frames with guaranteed correct dimensions"""
+        self.update_progress(0.2, "Loading browser...")
+        st.info("Initializing browser...")
 
         frames_dir = os.path.join(output_dir, "frames")
         os.makedirs(frames_dir, exist_ok=True)
 
         total_frames = config.fps * config.duration
+        frame_time_s = 1.0 / config.fps
 
-        # Ensure dimensions are even for H.264 compatibility
-        viewport_width = config.width if config.width % 2 == 0 else config.width + 1
-        viewport_height = config.height if config.height % 2 == 0 else config.height + 1
+        # Target dimensions (ensure even for H.264)
+        target_width = config.width if config.width % 2 == 0 else config.width + 1
+        target_height = config.height if config.height % 2 == 0 else config.height + 1
 
-        st.info(f"🖥️ Target dimensions: {viewport_width}x{viewport_height}")
+        st.info(f"Target dimensions: {target_width}x{target_height}")
 
-        # Chromium has a minimum viewport height in headless mode (~400px typically)
-        # We'll use a larger window and scale the content
-        browser_width = max(viewport_width, 800)
-        browser_height = max(viewport_height, 600)
-
-        st.info(f"📱 Browser window: {browser_width}x{browser_height} (minimum required)")
-
+        # Chrome options - REQUIREMENT #1: Set window size in chrome_options
         chrome_options = Options()
-        chrome_options.add_argument("--headless")  # Use old headless mode for better compatibility
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--disable-software-rasterizer")
-        chrome_options.add_argument(f"--window-size={browser_width},{browser_height}")
-        chrome_options.add_argument("--force-device-scale-factor=1")
-        chrome_options.add_argument("--hide-scrollbars")
-        chrome_options.add_argument("--disable-infobars")
-        chrome_options.add_argument("--start-maximized")
-        chrome_options.add_argument("--force-viewport-dimensions")
+        chrome_options.add_argument('--headless=new')
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--hide-scrollbars')
+        chrome_options.add_argument('--force-device-scale-factor=1')
+        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+        # Add extra height for browser chrome in headless mode
+        chrome_options.add_argument(f'--window-size={target_width},{target_height + 100}')
 
-        # Detect browser binary location
+        st.info(f"Chrome window-size: {target_width}x{target_height + 100}")
+
+        # Find browser binary
         browser_paths = [
-            "/Applications/Comet.app/Contents/MacOS/Comet",  # Comet (macOS)
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",  # Chrome (macOS)
-            "/usr/bin/chromium",  # Chromium (Linux/Streamlit Cloud)
-            "/usr/bin/chromium-browser",  # Chromium (alternative)
-            "/usr/bin/google-chrome",  # Chrome (Linux)
+            "/Applications/Comet.app/Contents/MacOS/Comet",
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",
+            "/usr/bin/chromium",
+            "/usr/bin/chromium-browser",
+            "/usr/bin/google-chrome"
         ]
 
         for path in browser_paths:
@@ -207,102 +203,123 @@ class HTML5ToVideoConverter:
         try:
             driver = webdriver.Chrome(options=chrome_options)
         except Exception as e:
-            st.error(f"❌ Browser error: {e}")
-            st.info("💡 Make sure packages.txt includes: chromium, chromium-driver")
+            st.error(f"Browser error: {e}")
+            st.info("Make sure packages.txt includes: chromium, chromium-driver")
             with st.expander("Show error details"):
                 st.code(str(e), language="text")
             return None
 
         try:
-            driver.set_window_size(browser_width, browser_height)
+            # REQUIREMENT #2: Set window size via Selenium (in addition to chrome_options)
+            driver.set_window_size(target_width, target_height + 100)
+            st.info(f"Selenium set_window_size: {target_width}x{target_height + 100}")
+
+            # Load HTML
             file_url = f"file://{html_path}"
             driver.get(file_url)
-            time.sleep(1)
 
-            # Our target dimensions
-            actual_width = viewport_width
-            actual_height = viewport_height
-
-            st.info(f"🎯 Will capture at: {actual_width}x{actual_height}")
-
-            # Force body AND html to be exactly the size we want
-            driver.execute_script(f"""
-                document.body.style.width = '{actual_width}px';
-                document.body.style.height = '{actual_height}px';
-                document.body.style.minHeight = '{actual_height}px';
-                document.body.style.maxHeight = '{actual_height}px';
-                document.body.style.overflow = 'hidden';
-                document.body.style.margin = '0';
-                document.body.style.padding = '0';
-
-                document.documentElement.style.width = '{actual_width}px';
-                document.documentElement.style.height = '{actual_height}px';
-                document.documentElement.style.minHeight = '{actual_height}px';
-                document.documentElement.style.maxHeight = '{actual_height}px';
-                document.documentElement.style.overflow = 'hidden';
+            # REQUIREMENT #3: Force document and body to EXACT dimensions via JavaScript
+            js_resize = f"""
                 document.documentElement.style.margin = '0';
                 document.documentElement.style.padding = '0';
-            """)
-            time.sleep(0.5)
+                document.documentElement.style.overflow = 'hidden';
+                document.documentElement.style.width = '{target_width}px';
+                document.documentElement.style.height = '{target_height}px';
 
-            # Verify the viewport size
-            viewport_w = driver.execute_script("return window.innerWidth;")
-            viewport_h = driver.execute_script("return window.innerHeight;")
-            st.info(f"✅ Final viewport: {viewport_w}x{viewport_h}")
+                document.body.style.margin = '0';
+                document.body.style.padding = '0';
+                document.body.style.overflow = 'hidden';
+                document.body.style.width = '{target_width}px';
+                document.body.style.height = '{target_height}px';
+                document.body.style.minWidth = '{target_width}px';
+                document.body.style.minHeight = '{target_height}px';
+                document.body.style.maxWidth = '{target_width}px';
+                document.body.style.maxHeight = '{target_height}px';
 
-            st.info(f"📸 Capturing {total_frames} frames at {config.fps} FPS...")
-            self.update_progress(0.3, f"📸 Capturing frames...")
+                var canvases = document.getElementsByTagName('canvas');
+                for (var i = 0; i < canvases.length; i++) {{
+                    canvases[i].style.width = '{target_width}px';
+                    canvases[i].style.height = '{target_height}px';
+                }}
+            """
+            driver.execute_script(js_resize)
+            st.info("JavaScript resize applied")
+
+            # REQUIREMENT #4: Delay for page to settle
+            time.sleep(1.5)
+
+            # REQUIREMENT #5: Log detected, requested, and actual dimensions
+            actual_viewport_w = driver.execute_script("return window.innerWidth;")
+            actual_viewport_h = driver.execute_script("return window.innerHeight;")
+            actual_body_w = driver.execute_script("return document.body.offsetWidth;")
+            actual_body_h = driver.execute_script("return document.body.offsetHeight;")
+
+            st.info(f"Detected from HTML: {config.width}x{config.height}")
+            st.info(f"Requested (even): {target_width}x{target_height}")
+            st.info(f"Actual viewport: {actual_viewport_w}x{actual_viewport_h}")
+            st.info(f"Actual body: {actual_body_w}x{actual_body_h}")
+
+            # Capture frames
+            st.info(f"Capturing {total_frames} frames at {config.fps} FPS...")
+            self.update_progress(0.3, "Capturing frames...")
 
             progress_bar = st.progress(0)
             status_text = st.empty()
 
-            frame_time_s = 1.0 / config.fps
-
-            # Determine capture method based on first frame test
-            use_element_screenshot = False
-
             for frame_num in range(total_frames):
-                # Update external progress proportionally (30% to 70% for capture phase)
                 frame_progress = 0.3 + (0.4 * (frame_num + 1) / total_frames)
-                self.update_progress(frame_progress, f"📸 Frame {frame_num + 1}/{total_frames}")
+                self.update_progress(frame_progress, f"Frame {frame_num + 1}/{total_frames}")
+
                 if self.cancelled:
                     driver.quit()
                     return None
 
                 frame_path = os.path.join(frames_dir, f"frame_{frame_num:06d}.png")
+                temp_screenshot = frame_path + ".tmp"
 
-                # Take screenshot and crop to exact size
-                temp_path = frame_path + ".tmp.png"
-                driver.save_screenshot(temp_path)
+                # Take screenshot
+                driver.save_screenshot(temp_screenshot)
 
-                # Crop/resize to exact dimensions using PIL
-                from PIL import Image
-                with Image.open(temp_path) as img:
-                    # If screenshot is larger, crop to top-left corner
-                    if img.size[0] >= actual_width and img.size[1] >= actual_height:
-                        cropped = img.crop((0, 0, actual_width, actual_height))
-                        cropped.save(frame_path)
+                # REQUIREMENT #6: If wrong size, crop/resize to match and continue
+                with Image.open(temp_screenshot) as img:
+                    screenshot_w, screenshot_h = img.size
+
+                    if frame_num == 0:
+                        st.info(f"Screenshot captured: {screenshot_w}x{screenshot_h}")
+
+                    # Case 1: Larger or equal - crop it
+                    if screenshot_w >= target_width and screenshot_h >= target_height:
+                        corrected = img.crop((0, 0, target_width, target_height))
+                        corrected.save(frame_path)
                         if frame_num == 0:
-                            st.success(f"✅ Cropping {img.size[0]}x{img.size[1]} to {actual_width}x{actual_height}")
-                    # If screenshot is exact size, just copy
-                    elif img.size[0] == actual_width and img.size[1] == actual_height:
+                            st.success(f"Cropped to {target_width}x{target_height}")
+
+                    # Case 2: Smaller - resize it
+                    elif screenshot_w < target_width or screenshot_h < target_height:
+                        corrected = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+                        corrected.save(frame_path)
+                        if frame_num == 0:
+                            st.warning(f"Resized from {screenshot_w}x{screenshot_h} to {target_width}x{target_height}")
+
+                    # Case 3: Exact match
+                    else:
                         img.save(frame_path)
                         if frame_num == 0:
-                            st.success(f"✅ Perfect size: {actual_width}x{actual_height}")
-                    # If screenshot is smaller, we have a problem
-                    else:
-                        # Resize to target dimensions
-                        resized = img.resize((actual_width, actual_height), Image.Resampling.LANCZOS)
-                        resized.save(frame_path)
-                        if frame_num == 0:
-                            st.warning(f"⚠️ Resizing {img.size[0]}x{img.size[1]} to {actual_width}x{actual_height}")
+                            st.success(f"Exact match: {target_width}x{target_height}")
 
-                # Clean up temp file
-                import os as os_module
-                try:
-                    os_module.remove(temp_path)
-                except:
-                    pass
+                    # REQUIREMENT #7: Output debug frame 'frame_fixed.png'
+                    if frame_num == 0:
+                        debug_frame = os.path.join(output_dir, "frame_fixed.png")
+                        with Image.open(frame_path) as fixed_img:
+                            fixed_img.save(debug_frame)
+                            final_w, final_h = fixed_img.size
+                            st.info(f"Debug frame saved: frame_fixed.png ({final_w}x{final_h})")
+                            if final_w == target_width and final_h == target_height:
+                                st.success(f"Dimensions match target!")
+                            else:
+                                st.error(f"Dimension mismatch! Expected {target_width}x{target_height}")
+
+                os.unlink(temp_screenshot)
 
                 progress = (frame_num + 1) / total_frames
                 progress_bar.progress(progress)
@@ -313,10 +330,10 @@ class HTML5ToVideoConverter:
             driver.quit()
             progress_bar.empty()
             status_text.empty()
-            st.success("✅ Frame capture complete!")
+            st.success("Frame capture complete")
 
         except Exception as e:
-            st.error(f"❌ Rendering error: {e}")
+            st.error(f"Rendering error: {e}")
             try:
                 driver.quit()
             except:
