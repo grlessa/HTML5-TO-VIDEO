@@ -684,7 +684,6 @@ def main():
 
     # Header
     st.markdown('<h1 class="main-title">🎬 HTML5 to Video Converter</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="subtitle">Professional conversion with auto-detection and full control</p>', unsafe_allow_html=True)
 
     # Two-column layout from the start
     left_col, right_col = st.columns([2, 1])
@@ -814,20 +813,9 @@ def main():
                     crf=crf
                 )
 
-                # Simple progress indicators
-                main_progress = st.progress(0)
-                status_message = st.empty()
-
-                status_message.info("🎬 Converting video...")
-                main_progress.progress(0.5)
-
-                # All detailed output goes in expander
-                with st.expander("🔍 Show Conversion Details", expanded=False):
-                    converter = HTML5ToVideoConverter()
-                    success = converter.convert(temp_zip.name, output_file.name, config)
-
-                main_progress.progress(1.0)
-                status_message.success("✅ Conversion complete!")
+                # Run conversion with detailed progress
+                converter = HTML5ToVideoConverter()
+                success = converter.convert(temp_zip.name, output_file.name, config)
 
                 if success and os.path.exists(output_file.name):
                     st.balloons()
@@ -859,14 +847,6 @@ def main():
             except:
                 pass
 
-    # Footer
-    st.markdown("---")
-    st.markdown("""
-        <div style='text-align: center; color: #666; padding: 20px;'>
-            <p>Built with ❤️ using Streamlit, Selenium & FFmpeg</p>
-            <p style='font-size: 12px;'>Supports H.264, H.265, VP9, and ProRes codecs</p>
-        </div>
-    """, unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
