@@ -310,6 +310,55 @@ class HTML5ToVideoConverter:
             if actual_viewport_w != target_width or actual_viewport_h != target_height:
                 self.log(f"WARNING: Viewport mismatch! Expected {target_width}x{target_height}, got {actual_viewport_w}x{actual_viewport_h}")
 
+            # Trigger animations and prepare for recording
+            self.log(f"=== ANIMATION SETUP ===")
+            self.log("Triggering animations and interactive elements...")
+
+            # Execute JavaScript to start animations and simulate interactions
+            animation_trigger_script = """
+                // Force all CSS animations to run
+                var style = document.createElement('style');
+                style.innerHTML = `
+                    * {
+                        animation-play-state: running !important;
+                        animation-delay: 0s !important;
+                        transition-duration: 0.1s !important;
+                    }
+                `;
+                document.head.appendChild(style);
+
+                // Simulate hover on all interactive elements
+                var interactiveElements = document.querySelectorAll('a, button, [class*="hover"], [class*="interactive"]');
+                interactiveElements.forEach(function(el) {
+                    el.dispatchEvent(new MouseEvent('mouseover', {bubbles: true, cancelable: true}));
+                    el.dispatchEvent(new MouseEvent('mouseenter', {bubbles: true, cancelable: true}));
+                });
+
+                // Click the body to trigger any click-based animations
+                document.body.click();
+                document.body.dispatchEvent(new MouseEvent('mouseover', {bubbles: true}));
+
+                // Trigger common animation start functions
+                if (typeof startAnimation === 'function') startAnimation();
+                if (typeof start === 'function') start();
+                if (typeof init === 'function') init();
+                if (typeof play === 'function') play();
+                if (typeof animate === 'function') animate();
+
+                // For canvas/WebGL animations
+                window.animationStartTime = Date.now();
+                window.animationEnabled = true;
+
+                // Trigger any paused videos
+                var videos = document.getElementsByTagName('video');
+                for (var i = 0; i < videos.length; i++) {
+                    videos[i].play();
+                }
+            """
+            driver.execute_script(animation_trigger_script)
+            time.sleep(0.5)  # Give animations time to initialize
+            self.log("Animations triggered")
+
             # Capture frames
             self.log(f"=== FRAME CAPTURE ===")
             self.log(f"Total frames to capture: {total_frames}")
@@ -392,6 +441,25 @@ class HTML5ToVideoConverter:
 
                 if frame_num == 0 or frame_num % 10 == 0 or frame_num == total_frames - 1:
                     self.log(f"Frame {frame_num + 1} saved: {os.path.basename(frame_path)}")
+
+                # Advance animation time for next frame
+                # This simulates time passing and triggers animation updates
+                time_advance_ms = int(frame_time_s * 1000)
+                driver.execute_script(f"""
+                    // Advance animation time
+                    if (window.animationStartTime) {{
+                        window.animationStartTime -= {time_advance_ms};
+                    }}
+
+                    // Trigger requestAnimationFrame callbacks
+                    if (window.requestAnimationFrame) {{
+                        window.requestAnimationFrame(function() {{}});
+                    }}
+
+                    // Dispatch events to trigger updates
+                    window.dispatchEvent(new Event('resize'));
+                    document.dispatchEvent(new Event('DOMContentLoaded'));
+                """)
 
                 time.sleep(frame_time_s)
 
