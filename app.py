@@ -345,6 +345,23 @@ class HTML5ToVideoConverter:
                 if (typeof play === 'function') play();
                 if (typeof animate === 'function') animate();
 
+                // CreateJS/EaselJS support (common in HTML5 ads)
+                if (typeof createjs !== 'undefined' && createjs.Ticker) {
+                    console.log('CreateJS detected, setting up ticker');
+                    window.__createJSActive = true;
+                    if (!createjs.Ticker.hasEventListener('tick')) {
+                        console.log('CreateJS ticker not started, starting now');
+                        createjs.Ticker.framerate = 30;
+                        createjs.Ticker.timingMode = createjs.Ticker.RAF;
+                    }
+                }
+
+                // GSAP support
+                if (typeof gsap !== 'undefined') {
+                    console.log('GSAP detected');
+                    window.__gsapActive = true;
+                }
+
                 // For canvas/WebGL animations
                 window.animationStartTime = Date.now();
                 window.animationEnabled = true;
@@ -354,9 +371,23 @@ class HTML5ToVideoConverter:
                 for (var i = 0; i < videos.length; i++) {
                     videos[i].play();
                 }
+
+                // Look for canvas elements and try to find their animation context
+                var canvases = document.getElementsByTagName('canvas');
+                console.log('Found ' + canvases.length + ' canvas elements');
+                for (var i = 0; i < canvases.length; i++) {
+                    console.log('Canvas ' + i + ': ' + canvases[i].width + 'x' + canvases[i].height);
+                }
             """
             driver.execute_script(animation_trigger_script)
             time.sleep(0.5)  # Give animations time to initialize
+
+            # Capture console logs to see what was detected
+            logs = driver.get_log('browser')
+            for log in logs:
+                if 'CreateJS' in log['message'] or 'GSAP' in log['message'] or 'canvas' in log['message'].lower():
+                    self.log(f"Browser console: {log['message']}")
+
             self.log("Animations triggered")
 
             # Capture frames
@@ -424,7 +455,23 @@ class HTML5ToVideoConverter:
                             }};
                         }}
 
-                        // Method 3: Trigger animation updates
+                        // Method 3: CreateJS time control (for HTML5 ads)
+                        if (typeof createjs !== 'undefined' && createjs.Ticker) {{
+                            console.log('Advancing CreateJS ticker to {elapsed_ms}ms');
+                            // Manually tick the CreateJS ticker
+                            var ticksNeeded = Math.floor({elapsed_ms} / (1000 / 30)); // Assuming 30fps
+                            for (var i = 0; i < ticksNeeded; i++) {{
+                                createjs.Ticker._tick();
+                            }}
+                        }}
+
+                        // Method 4: GSAP time control
+                        if (typeof gsap !== 'undefined' && gsap.globalTimeline) {{
+                            console.log('Advancing GSAP timeline to {elapsed_time}s');
+                            gsap.globalTimeline.time({elapsed_time});
+                        }}
+
+                        // Method 5: Trigger animation updates
                         window.dispatchEvent(new Event('resize'));
                         document.body.offsetHeight; // Force reflow
 
