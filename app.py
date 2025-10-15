@@ -993,41 +993,35 @@ def main():
                     st.code(debug_output, language="text")
                     st.caption("↑ Complete process log (copy entire log)")
 
-                # Debug: Check file status
-                st.write(f"DEBUG: output_file.name = {output_file.name}")
-                st.write(f"DEBUG: File exists? {os.path.exists(output_file.name)}")
-                if os.path.exists(output_file.name):
-                    st.write(f"DEBUG: File size = {os.path.getsize(output_file.name)} bytes")
-
                 if success and os.path.exists(output_file.name):
                     # Read video bytes
                     with open(output_file.name, 'rb') as f:
                         video_bytes = f.read()
 
-                    st.write(f"DEBUG: Read {len(video_bytes)} bytes from video file")
+                    # Update RIGHT COLUMN preview by going back into right column context
+                    with right_col:
+                        # Clear the placeholder first
+                        preview_placeholder.empty()
 
-                    # Try showing video using HTML5 video tag with base64
-                    import base64
-                    video_base64 = base64.b64encode(video_bytes).decode()
-                    st.write(f"DEBUG: Base64 length = {len(video_base64)}")
+                        # Try showing video using HTML5 video tag with base64
+                        import base64
+                        video_base64 = base64.b64encode(video_bytes).decode()
+                        video_html = f"""
+                        <video width="100%" controls autoplay>
+                            <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                        """
+                        preview_placeholder.markdown(video_html, unsafe_allow_html=True)
 
-                    video_html = f"""
-                    <video width="100%" controls>
-                        <source src="data:video/mp4;base64,{video_base64}" type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video>
-                    """
-                    st.write("DEBUG: About to call preview_placeholder.markdown()")
-                    preview_placeholder.markdown(video_html, unsafe_allow_html=True)
-                    st.write("DEBUG: Called preview_placeholder.markdown()")
-
-                    download_placeholder.download_button(
-                        label="Download Video",
-                        data=video_bytes,
-                        file_name="converted_video.mp4",
-                        mime="video/mp4",
-                        use_container_width=True
-                    )
+                        # Download button also in right column
+                        download_placeholder.download_button(
+                            label="Download Video",
+                            data=video_bytes,
+                            file_name="converted_video.mp4",
+                            mime="video/mp4",
+                            use_container_width=True
+                        )
 
             # Cleanup zip
             try:
