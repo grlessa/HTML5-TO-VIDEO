@@ -162,7 +162,7 @@ class HTML5ToVideoConverter:
         st.info(f"🖥️ Browser viewport: {viewport_width}x{viewport_height}")
 
         chrome_options = Options()
-        chrome_options.add_argument("--headless=new")
+        chrome_options.add_argument("--headless")  # Use old headless mode for better compatibility
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
@@ -170,6 +170,8 @@ class HTML5ToVideoConverter:
         chrome_options.add_argument(f"--window-size={viewport_width},{viewport_height}")
         chrome_options.add_argument("--force-device-scale-factor=1")
         chrome_options.add_argument("--hide-scrollbars")
+        chrome_options.add_argument("--disable-infobars")
+        chrome_options.add_argument("--start-maximized")
 
         # Detect browser binary location
         browser_paths = [
@@ -202,24 +204,49 @@ class HTML5ToVideoConverter:
             time.sleep(1)
 
             # Get actual rendered content size
-            body_width = driver.execute_script("return document.body.scrollWidth;")
-            body_height = driver.execute_script("return document.body.scrollHeight;")
+            body_width = driver.execute_script("return Math.max(document.body.scrollWidth, document.documentElement.scrollWidth, document.body.offsetWidth, document.documentElement.offsetWidth, document.body.clientWidth, document.documentElement.clientWidth);")
+            body_height = driver.execute_script("return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.offsetHeight, document.documentElement.offsetHeight, document.body.clientHeight, document.documentElement.clientHeight);")
             st.info(f"📄 Actual content size: {body_width}x{body_height}")
 
-            # If content is bigger than viewport, adjust viewport
-            if body_width > viewport_width or body_height > viewport_height:
-                actual_width = max(body_width, viewport_width)
-                actual_height = max(body_height, viewport_height)
+            # Always use the actual content dimensions
+            actual_width = body_width
+            actual_height = body_height
 
-                # Make even
-                if actual_width % 2 != 0:
-                    actual_width += 1
-                if actual_height % 2 != 0:
-                    actual_height += 1
+            # Make even for H.264
+            if actual_width % 2 != 0:
+                actual_width += 1
+            if actual_height % 2 != 0:
+                actual_height += 1
 
-                st.warning(f"⚠️ Content larger than viewport! Adjusting to: {actual_width}x{actual_height}")
+            if actual_width != viewport_width or actual_height != viewport_height:
+                st.info(f"📏 Adjusting viewport to content: {actual_width}x{actual_height}")
                 driver.set_window_size(actual_width, actual_height)
-                time.sleep(0.5)
+                time.sleep(1)  # Give browser time to resize
+
+            # Force body AND html to be exactly the size we want
+            driver.execute_script(f"""
+                document.body.style.width = '{actual_width}px';
+                document.body.style.height = '{actual_height}px';
+                document.body.style.minHeight = '{actual_height}px';
+                document.body.style.maxHeight = '{actual_height}px';
+                document.body.style.overflow = 'hidden';
+                document.body.style.margin = '0';
+                document.body.style.padding = '0';
+
+                document.documentElement.style.width = '{actual_width}px';
+                document.documentElement.style.height = '{actual_height}px';
+                document.documentElement.style.minHeight = '{actual_height}px';
+                document.documentElement.style.maxHeight = '{actual_height}px';
+                document.documentElement.style.overflow = 'hidden';
+                document.documentElement.style.margin = '0';
+                document.documentElement.style.padding = '0';
+            """)
+            time.sleep(0.5)
+
+            # Verify the viewport size
+            viewport_w = driver.execute_script("return window.innerWidth;")
+            viewport_h = driver.execute_script("return window.innerHeight;")
+            st.info(f"✅ Final viewport: {viewport_w}x{viewport_h}")
 
             st.info(f"📸 Capturing {total_frames} frames at {config.fps} FPS...")
 
@@ -235,6 +262,17 @@ class HTML5ToVideoConverter:
 
                 frame_path = os.path.join(frames_dir, f"frame_{frame_num:06d}.png")
                 driver.save_screenshot(frame_path)
+
+                # Verify first frame dimensions
+                if frame_num == 0:
+                    from PIL import Image
+                    with Image.open(frame_path) as img:
+                        captured_w, captured_h = img.size
+                        if captured_w != actual_width or captured_h != actual_height:
+                            st.error(f"❌ Screenshot size mismatch!")
+                            st.error(f"Expected: {actual_width}x{actual_height}")
+                            st.error(f"Captured: {captured_w}x{captured_h}")
+                            st.warning("⚠️ Browser may not be capturing full content. Continuing anyway...")
 
                 progress = (frame_num + 1) / total_frames
                 progress_bar.progress(progress)
