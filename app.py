@@ -998,8 +998,13 @@ def main():
                     with open(output_file.name, 'rb') as f:
                         video_bytes = f.read()
 
+                    st.write(f"DEBUG: About to show video, size={len(video_bytes)} bytes")
+
                     # Update preview directly
                     preview_placeholder.video(video_bytes)
+
+                    st.write("DEBUG: Called preview_placeholder.video()")
+
                     download_placeholder.download_button(
                         label="Download Video",
                         data=video_bytes,
