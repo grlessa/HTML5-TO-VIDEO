@@ -155,14 +155,21 @@ class HTML5ToVideoConverter:
 
         total_frames = config.fps * config.duration
 
+        # Ensure dimensions are even for H.264 compatibility
+        viewport_width = config.width if config.width % 2 == 0 else config.width + 1
+        viewport_height = config.height if config.height % 2 == 0 else config.height + 1
+
+        st.info(f"🖥️ Browser viewport: {viewport_width}x{viewport_height}")
+
         chrome_options = Options()
         chrome_options.add_argument("--headless=new")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--disable-software-rasterizer")
-        chrome_options.add_argument(f"--window-size={config.width},{config.height}")
+        chrome_options.add_argument(f"--window-size={viewport_width},{viewport_height}")
         chrome_options.add_argument("--force-device-scale-factor=1")
+        chrome_options.add_argument("--hide-scrollbars")
 
         # Detect browser binary location
         browser_paths = [
@@ -189,10 +196,30 @@ class HTML5ToVideoConverter:
             return None
 
         try:
-            driver.set_window_size(config.width, config.height)
+            driver.set_window_size(viewport_width, viewport_height)
             file_url = f"file://{html_path}"
             driver.get(file_url)
             time.sleep(1)
+
+            # Get actual rendered content size
+            body_width = driver.execute_script("return document.body.scrollWidth;")
+            body_height = driver.execute_script("return document.body.scrollHeight;")
+            st.info(f"📄 Actual content size: {body_width}x{body_height}")
+
+            # If content is bigger than viewport, adjust viewport
+            if body_width > viewport_width or body_height > viewport_height:
+                actual_width = max(body_width, viewport_width)
+                actual_height = max(body_height, viewport_height)
+
+                # Make even
+                if actual_width % 2 != 0:
+                    actual_width += 1
+                if actual_height % 2 != 0:
+                    actual_height += 1
+
+                st.warning(f"⚠️ Content larger than viewport! Adjusting to: {actual_width}x{actual_height}")
+                driver.set_window_size(actual_width, actual_height)
+                time.sleep(0.5)
 
             st.info(f"📸 Capturing {total_frames} frames at {config.fps} FPS...")
 
@@ -247,27 +274,39 @@ class HTML5ToVideoConverter:
         # Get frame dimensions and ensure they're even (H.264 requirement)
         from PIL import Image
         first_frame_path = os.path.join(frames_dir, frame_files[0])
+        needs_scaling = False
+        scale_filter = ""
+
         try:
             with Image.open(first_frame_path) as img:
                 frame_width, frame_height = img.size
-                st.info(f"📐 Original frame size: {frame_width}x{frame_height}")
+                st.info(f"📐 Captured frame size: {frame_width}x{frame_height}")
 
                 # H.264 requires even dimensions
-                if frame_width % 2 != 0:
-                    frame_width -= 1
-                if frame_height % 2 != 0:
-                    frame_height -= 1
+                adjusted_width = frame_width
+                adjusted_height = frame_height
 
-                if frame_width != img.size[0] or frame_height != img.size[1]:
-                    st.info(f"✂️ Adjusted to even dimensions: {frame_width}x{frame_height}")
+                if frame_width % 2 != 0:
+                    adjusted_width = frame_width - 1
+                    needs_scaling = True
+
+                if frame_height % 2 != 0:
+                    adjusted_height = frame_height - 1
+                    needs_scaling = True
+
+                if needs_scaling:
+                    st.warning(f"⚠️ Odd dimensions detected! Will adjust: {frame_width}x{frame_height} → {adjusted_width}x{adjusted_height}")
+                    scale_filter = f"-vf scale={adjusted_width}:{adjusted_height}:flags=lanczos"
+                else:
+                    st.success(f"✅ Dimensions are even - no scaling needed!")
+
         except Exception as e:
-            st.warning(f"⚠️ Using config dimensions: {e}")
-            frame_width, frame_height = config.width, config.height
-            # Ensure even
-            if frame_width % 2 != 0:
-                frame_width -= 1
-            if frame_height % 2 != 0:
-                frame_height -= 1
+            st.error(f"⚠️ Could not read frame: {e}")
+            # Fallback - assume we need basic dimensions
+            adjusted_width = config.width if config.width % 2 == 0 else config.width - 1
+            adjusted_height = config.height if config.height % 2 == 0 else config.height - 1
+            scale_filter = f"-vf scale={adjusted_width}:{adjusted_height}:flags=lanczos"
+            needs_scaling = True
 
         # Build FFmpeg command with maximum compatibility
         ffmpeg_cmd = [
@@ -275,10 +314,16 @@ class HTML5ToVideoConverter:
             "-y",  # Overwrite output
             "-framerate", str(config.fps),
             "-i", input_pattern,
-            "-vf", f"scale={frame_width}:{frame_height}:flags=lanczos",  # Scale to even dimensions
+        ]
+
+        # Only add scale filter if needed
+        if needs_scaling:
+            ffmpeg_cmd.extend(scale_filter.split())
+
+        ffmpeg_cmd.extend([
             "-c:v", config.codec,
             "-pix_fmt", "yuv420p",
-        ]
+        ])
 
         # Add codec-specific settings - keep it SIMPLE for cloud compatibility
         if config.codec in ["libx264", "libx265"]:
