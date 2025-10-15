@@ -236,8 +236,8 @@ class HTML5ToVideoConverter:
 
         input_pattern = os.path.join(frames_dir, "frame_%06d.png")
 
-        # Build FFmpeg command with better compatibility
-        # Note: CRF and bitrate should NOT be used together - CRF is constant quality, bitrate is constant bitrate
+        # Build FFmpeg command with maximum compatibility
+        # Simplify to most basic, universally supported options
         ffmpeg_cmd = [
             "ffmpeg",
             "-y",  # Overwrite output
@@ -247,32 +247,24 @@ class HTML5ToVideoConverter:
             "-pix_fmt", "yuv420p",
         ]
 
-        # Add preset and quality settings for x264/x265 codecs
+        # Add codec-specific settings - keep it SIMPLE for cloud compatibility
         if config.codec in ["libx264", "libx265"]:
-            ffmpeg_cmd.extend(["-preset", config.preset])
-            # Use CRF mode (constant quality) - better than bitrate
+            # Use only CRF (no bitrate constraints that might conflict)
             ffmpeg_cmd.extend(["-crf", str(config.crf)])
-            # Add maxrate for compatibility (soft limit)
-            ffmpeg_cmd.extend(["-maxrate", config.bitrate])
-            # Calculate buffer size (2x maxrate)
-            try:
-                bitrate_val = int(config.bitrate.replace('M', '').replace('K', '').replace('k', ''))
-                if 'M' in config.bitrate or 'm' in config.bitrate:
-                    bufsize = f"{bitrate_val * 2}M"
-                else:
-                    bufsize = f"{bitrate_val * 2}k"
-            except:
-                bufsize = "20M"  # Default fallback
-            ffmpeg_cmd.extend(["-bufsize", bufsize])
+            # Use faster preset for cloud compatibility
+            if config.preset in ["veryslow", "slower", "slow"]:
+                ffmpeg_cmd.extend(["-preset", "medium"])  # Override slow presets
+            else:
+                ffmpeg_cmd.extend(["-preset", config.preset])
+        elif config.codec == "libvpx-vp9":
+            ffmpeg_cmd.extend(["-b:v", config.bitrate])
+            ffmpeg_cmd.extend(["-crf", str(config.crf)])
         else:
-            # For other codecs, use bitrate mode
+            # For other codecs, use simple bitrate
             ffmpeg_cmd.extend(["-b:v", config.bitrate])
 
-        # Add final options
-        ffmpeg_cmd.extend([
-            "-movflags", "+faststart",
-            "-strict", "experimental",  # Allow experimental features if needed
-        ])
+        # Add universal compatibility flags
+        ffmpeg_cmd.extend(["-movflags", "+faststart"])
 
         # Add output path
         ffmpeg_cmd.append(output_path)
@@ -285,6 +277,10 @@ class HTML5ToVideoConverter:
                 return False
 
             st.info(f"🎬 Encoding {len(frame_files)} frames...")
+
+            # Show FFmpeg command for debugging
+            with st.expander("FFmpeg command (for debugging)"):
+                st.code(" ".join(ffmpeg_cmd), language="bash")
 
             process = subprocess.Popen(
                 ffmpeg_cmd,
@@ -315,7 +311,41 @@ class HTML5ToVideoConverter:
                     with st.expander("Show FFmpeg output"):
                         st.code(stderr[-2000:], language="text")  # Last 2000 chars
 
-                return False
+                # Try fallback with minimal parameters
+                st.warning("⚠️ Trying fallback encoding with minimal parameters...")
+
+                fallback_cmd = [
+                    "ffmpeg", "-y",
+                    "-framerate", str(config.fps),
+                    "-i", input_pattern,
+                    "-c:v", "libx264",
+                    "-pix_fmt", "yuv420p",
+                    "-profile:v", "baseline",  # Most compatible profile
+                    "-level", "3.0",
+                    output_path
+                ]
+
+                with st.expander("Fallback FFmpeg command"):
+                    st.code(" ".join(fallback_cmd), language="bash")
+
+                fallback_process = subprocess.Popen(
+                    fallback_cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    universal_newlines=True
+                )
+
+                fallback_stdout, fallback_stderr = fallback_process.communicate()
+
+                if fallback_process.returncode == 0:
+                    st.success("✅ Fallback encoding succeeded!")
+                    st.info("Note: Used baseline profile for maximum compatibility")
+                    return True
+                else:
+                    st.error("❌ Fallback encoding also failed")
+                    with st.expander("Fallback error details"):
+                        st.code(fallback_stderr[-1000:], language="text")
+                    return False
 
         except FileNotFoundError:
             st.error("❌ FFmpeg not found. Please install FFmpeg.")
