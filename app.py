@@ -236,13 +236,46 @@ class HTML5ToVideoConverter:
 
         input_pattern = os.path.join(frames_dir, "frame_%06d.png")
 
+        # Check if frames exist first
+        frame_files = sorted([f for f in os.listdir(frames_dir) if f.endswith('.png')])
+        if not frame_files:
+            st.error("❌ No frames found to encode!")
+            return False
+
+        st.info(f"🎬 Found {len(frame_files)} frames to encode")
+
+        # Get frame dimensions and ensure they're even (H.264 requirement)
+        from PIL import Image
+        first_frame_path = os.path.join(frames_dir, frame_files[0])
+        try:
+            with Image.open(first_frame_path) as img:
+                frame_width, frame_height = img.size
+                st.info(f"📐 Original frame size: {frame_width}x{frame_height}")
+
+                # H.264 requires even dimensions
+                if frame_width % 2 != 0:
+                    frame_width -= 1
+                if frame_height % 2 != 0:
+                    frame_height -= 1
+
+                if frame_width != img.size[0] or frame_height != img.size[1]:
+                    st.info(f"✂️ Adjusted to even dimensions: {frame_width}x{frame_height}")
+        except Exception as e:
+            st.warning(f"⚠️ Using config dimensions: {e}")
+            frame_width, frame_height = config.width, config.height
+            # Ensure even
+            if frame_width % 2 != 0:
+                frame_width -= 1
+            if frame_height % 2 != 0:
+                frame_height -= 1
+
         # Build FFmpeg command with maximum compatibility
-        # Simplify to most basic, universally supported options
         ffmpeg_cmd = [
             "ffmpeg",
             "-y",  # Overwrite output
             "-framerate", str(config.fps),
             "-i", input_pattern,
+            "-vf", f"scale={frame_width}:{frame_height}:flags=lanczos",  # Scale to even dimensions
             "-c:v", config.codec,
             "-pix_fmt", "yuv420p",
         ]
@@ -270,14 +303,6 @@ class HTML5ToVideoConverter:
         ffmpeg_cmd.append(output_path)
 
         try:
-            # Check if frames exist
-            frame_files = sorted([f for f in os.listdir(frames_dir) if f.endswith('.png')])
-            if not frame_files:
-                st.error("❌ No frames found to encode!")
-                return False
-
-            st.info(f"🎬 Encoding {len(frame_files)} frames...")
-
             # Show FFmpeg command for debugging
             with st.expander("FFmpeg command (for debugging)"):
                 st.code(" ".join(ffmpeg_cmd), language="bash")
@@ -314,14 +339,28 @@ class HTML5ToVideoConverter:
                 # Try fallback with minimal parameters
                 st.warning("⚠️ Trying fallback encoding with minimal parameters...")
 
+                # Get actual frame dimensions from first frame
+                try:
+                    from PIL import Image
+                    first_frame_path = os.path.join(frames_dir, frame_files[0])
+                    with Image.open(first_frame_path) as img:
+                        fw, fh = img.size
+                        # Ensure even dimensions
+                        fw = fw if fw % 2 == 0 else fw - 1
+                        fh = fh if fh % 2 == 0 else fh - 1
+                except:
+                    fw, fh = 1280, 720  # Safe default
+
                 fallback_cmd = [
                     "ffmpeg", "-y",
-                    "-framerate", str(config.fps),
+                    "-framerate", str(min(config.fps, 30)),  # Cap at 30fps for compatibility
                     "-i", input_pattern,
+                    "-vf", f"scale={fw}:{fh}:flags=lanczos",  # Ensure even dimensions
                     "-c:v", "libx264",
                     "-pix_fmt", "yuv420p",
                     "-profile:v", "baseline",  # Most compatible profile
                     "-level", "3.0",
+                    "-r", str(min(config.fps, 30)),  # Output framerate
                     output_path
                 ]
 
