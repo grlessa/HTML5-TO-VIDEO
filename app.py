@@ -994,30 +994,25 @@ def main():
                     st.caption("↑ Complete process log (copy entire log)")
 
                 if success and os.path.exists(output_file.name):
-                    # Read video bytes for download
+                    # Read video bytes
                     with open(output_file.name, 'rb') as f:
                         video_bytes = f.read()
 
-                    # Store for later display
-                    st.session_state['output_video'] = output_file.name
-                    st.session_state['video_bytes'] = video_bytes
+                    # Update preview directly
+                    preview_placeholder.video(video_bytes)
+                    download_placeholder.download_button(
+                        label="Download Video",
+                        data=video_bytes,
+                        file_name="converted_video.mp4",
+                        mime="video/mp4",
+                        use_container_width=True
+                    )
 
             # Cleanup zip
             try:
                 os.unlink(temp_zip.name)
             except:
                 pass
-
-    # OUTSIDE all column contexts - update preview if video exists
-    if 'video_bytes' in st.session_state and st.session_state['video_bytes']:
-        preview_placeholder.video(st.session_state['video_bytes'])
-        download_placeholder.download_button(
-            label="Download Video",
-            data=st.session_state['video_bytes'],
-            file_name="converted_video.mp4",
-            mime="video/mp4",
-            use_container_width=True
-        )
 
 
 
