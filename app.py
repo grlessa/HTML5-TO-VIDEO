@@ -160,23 +160,32 @@ class HTML5ToVideoConverter:
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--disable-software-rasterizer")
         chrome_options.add_argument(f"--window-size={config.width},{config.height}")
         chrome_options.add_argument("--force-device-scale-factor=1")
 
-        # Try Comet browser if available
-        comet_path = "/Applications/Comet.app/Contents/MacOS/Comet"
-        if os.path.exists(comet_path):
-            chrome_options.binary_location = comet_path
+        # Detect browser binary location
+        browser_paths = [
+            "/Applications/Comet.app/Contents/MacOS/Comet",  # Comet (macOS)
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",  # Chrome (macOS)
+            "/usr/bin/chromium",  # Chromium (Linux/Streamlit Cloud)
+            "/usr/bin/chromium-browser",  # Chromium (alternative)
+            "/usr/bin/google-chrome",  # Chrome (Linux)
+        ]
 
-        # Check for Chrome
-        chrome_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-        if os.path.exists(chrome_path) and not os.path.exists(comet_path):
-            chrome_options.binary_location = chrome_path
+        for path in browser_paths:
+            if os.path.exists(path):
+                chrome_options.binary_location = path
+                st.info(f"Using browser: {os.path.basename(path)}")
+                break
 
         try:
             driver = webdriver.Chrome(options=chrome_options)
         except Exception as e:
             st.error(f"❌ Browser error: {e}")
+            st.info("💡 Make sure packages.txt includes: chromium, chromium-driver")
+            with st.expander("Show error details"):
+                st.code(str(e), language="text")
             return None
 
         try:
@@ -227,21 +236,40 @@ class HTML5ToVideoConverter:
 
         input_pattern = os.path.join(frames_dir, "frame_%06d.png")
 
+        # Build FFmpeg command with better compatibility
         ffmpeg_cmd = [
             "ffmpeg",
-            "-y",
+            "-y",  # Overwrite output
             "-framerate", str(config.fps),
             "-i", input_pattern,
             "-c:v", config.codec,
-            "-preset", config.preset,
-            "-crf", str(config.crf),
+        ]
+
+        # Add preset only for x264/x265 codecs
+        if config.codec in ["libx264", "libx265"]:
+            ffmpeg_cmd.extend(["-preset", config.preset])
+            ffmpeg_cmd.extend(["-crf", str(config.crf)])
+
+        # Add bitrate and other settings
+        ffmpeg_cmd.extend([
             "-b:v", config.bitrate,
             "-pix_fmt", "yuv420p",
             "-movflags", "+faststart",
-            output_path
-        ]
+            "-vf", "format=yuv420p",  # Ensure compatibility
+        ])
+
+        # Add output path
+        ffmpeg_cmd.append(output_path)
 
         try:
+            # Check if frames exist
+            frame_files = sorted([f for f in os.listdir(frames_dir) if f.endswith('.png')])
+            if not frame_files:
+                st.error("❌ No frames found to encode!")
+                return False
+
+            st.info(f"🎬 Encoding {len(frame_files)} frames...")
+
             process = subprocess.Popen(
                 ffmpeg_cmd,
                 stdout=subprocess.PIPE,
@@ -249,20 +277,39 @@ class HTML5ToVideoConverter:
                 universal_newlines=True
             )
 
-            process.wait()
+            # Capture output
+            stdout, stderr = process.communicate()
 
             if process.returncode == 0:
                 st.success("✅ Video encoding complete!")
                 return True
             else:
+                # Show detailed error
                 st.error(f"❌ FFmpeg error (exit code {process.returncode})")
+
+                # Show last few lines of error output
+                error_lines = stderr.strip().split('\n')
+                relevant_errors = [line for line in error_lines if 'error' in line.lower() or 'invalid' in line.lower()]
+
+                if relevant_errors:
+                    with st.expander("Show error details"):
+                        for line in relevant_errors[-5:]:
+                            st.code(line, language="text")
+                else:
+                    with st.expander("Show FFmpeg output"):
+                        st.code(stderr[-2000:], language="text")  # Last 2000 chars
+
                 return False
 
         except FileNotFoundError:
             st.error("❌ FFmpeg not found. Please install FFmpeg.")
+            st.info("On Streamlit Cloud, make sure 'packages.txt' includes 'ffmpeg'")
             return False
         except Exception as e:
             st.error(f"❌ Encoding error: {e}")
+            import traceback
+            with st.expander("Show error details"):
+                st.code(traceback.format_exc(), language="text")
             return False
 
     def convert(self, zip_path: str, output_path: str, config: VideoConfig) -> bool:
