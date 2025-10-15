@@ -254,10 +254,21 @@ class HTML5ToVideoConverter:
             actual_body_w = driver.execute_script("return document.body.offsetWidth;")
             actual_body_h = driver.execute_script("return document.body.offsetHeight;")
 
-            st.info(f"Detected from HTML: {config.width}x{config.height}")
-            st.info(f"Requested (even): {target_width}x{target_height}")
-            st.info(f"Actual viewport: {actual_viewport_w}x{actual_viewport_h}")
-            st.info(f"Actual body: {actual_body_w}x{actual_body_h}")
+            # Technical dimension analysis (copyable for debugging)
+            dimension_info = f"""
+DIMENSION ANALYSIS
+==================
+Detected from HTML: {config.width}x{config.height}
+Requested (even): {target_width}x{target_height}
+Actual viewport: {actual_viewport_w}x{actual_viewport_h}
+Actual body: {actual_body_w}x{actual_body_h}
+Match: {'YES' if actual_viewport_w == target_width and actual_viewport_h == target_height else 'NO'}
+"""
+            st.code(dimension_info, language="text")
+
+            # Also show as info for quick view
+            if actual_viewport_w != target_width or actual_viewport_h != target_height:
+                st.warning(f"⚠️ Viewport mismatch! Expected {target_width}x{target_height}, got {actual_viewport_w}x{actual_viewport_h}")
 
             # Capture frames
             st.info(f"Capturing {total_frames} frames at {config.fps} FPS...")
@@ -284,28 +295,49 @@ class HTML5ToVideoConverter:
                 with Image.open(temp_screenshot) as img:
                     screenshot_w, screenshot_h = img.size
 
+                    # Technical screenshot analysis on first frame
                     if frame_num == 0:
-                        st.info(f"Screenshot captured: {screenshot_w}x{screenshot_h}")
+                        screenshot_info = f"""
+SCREENSHOT ANALYSIS
+===================
+Screenshot size: {screenshot_w}x{screenshot_h}
+Target size: {target_width}x{target_height}
+Width diff: {screenshot_w - target_width:+d}px
+Height diff: {screenshot_h - target_height:+d}px
+"""
+                        # Case 1: Larger or equal - crop it
+                        if screenshot_w >= target_width and screenshot_h >= target_height:
+                            screenshot_info += f"Action: CROP from top-left ({screenshot_w}x{screenshot_h} → {target_width}x{target_height})\n"
+                            corrected = img.crop((0, 0, target_width, target_height))
+                            corrected.save(frame_path)
+                            st.code(screenshot_info, language="text")
+                            st.success(f"✓ Cropped to {target_width}x{target_height}")
 
-                    # Case 1: Larger or equal - crop it
-                    if screenshot_w >= target_width and screenshot_h >= target_height:
-                        corrected = img.crop((0, 0, target_width, target_height))
-                        corrected.save(frame_path)
-                        if frame_num == 0:
-                            st.success(f"Cropped to {target_width}x{target_height}")
+                        # Case 2: Smaller - resize it
+                        elif screenshot_w < target_width or screenshot_h < target_height:
+                            screenshot_info += f"Action: RESIZE with LANCZOS ({screenshot_w}x{screenshot_h} → {target_width}x{target_height})\n"
+                            screenshot_info += "WARNING: Screenshot smaller than expected!\n"
+                            corrected = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+                            corrected.save(frame_path)
+                            st.code(screenshot_info, language="text")
+                            st.warning(f"⚠️ Resized from {screenshot_w}x{screenshot_h}")
 
-                    # Case 2: Smaller - resize it
-                    elif screenshot_w < target_width or screenshot_h < target_height:
-                        corrected = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
-                        corrected.save(frame_path)
-                        if frame_num == 0:
-                            st.warning(f"Resized from {screenshot_w}x{screenshot_h} to {target_width}x{target_height}")
-
-                    # Case 3: Exact match
+                        # Case 3: Exact match
+                        else:
+                            screenshot_info += "Action: EXACT MATCH - no correction needed\n"
+                            img.save(frame_path)
+                            st.code(screenshot_info, language="text")
+                            st.success(f"✓ Perfect: {target_width}x{target_height}")
                     else:
-                        img.save(frame_path)
-                        if frame_num == 0:
-                            st.success(f"Exact match: {target_width}x{target_height}")
+                        # For subsequent frames, just do the correction without logging
+                        if screenshot_w >= target_width and screenshot_h >= target_height:
+                            corrected = img.crop((0, 0, target_width, target_height))
+                            corrected.save(frame_path)
+                        elif screenshot_w < target_width or screenshot_h < target_height:
+                            corrected = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+                            corrected.save(frame_path)
+                        else:
+                            img.save(frame_path)
 
                     # REQUIREMENT #7: Output debug frame 'frame_fixed.png'
                     if frame_num == 0:
@@ -434,9 +466,10 @@ class HTML5ToVideoConverter:
         ffmpeg_cmd.append(output_path)
 
         try:
-            # Show FFmpeg command for debugging
-            with st.expander("FFmpeg command (for debugging)"):
-                st.code(" ".join(ffmpeg_cmd), language="bash")
+            # Show FFmpeg command for debugging (copyable)
+            ffmpeg_command_str = " ".join(ffmpeg_cmd)
+            st.code(ffmpeg_command_str, language="bash")
+            st.caption("↑ Full FFmpeg command (copy for debugging)")
 
             process = subprocess.Popen(
                 ffmpeg_cmd,
@@ -450,6 +483,9 @@ class HTML5ToVideoConverter:
 
             if process.returncode == 0:
                 st.success("✅ Video encoding complete!")
+                # Show FFmpeg output for technical debugging
+                with st.expander("FFmpeg output (technical details)"):
+                    st.code(stderr, language="text")
                 return True
             else:
                 # Show detailed error
