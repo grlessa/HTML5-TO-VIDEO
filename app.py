@@ -122,6 +122,8 @@ class HTML5ToVideoConverter:
         self.cancelled = False
         self.progress_callback = progress_callback
         self.debug_log = []  # Collect all debug output
+        import datetime
+        self.start_time = datetime.datetime.now()
 
     def update_progress(self, value, message=None):
         """Update external progress if callback provided"""
@@ -140,22 +142,36 @@ class HTML5ToVideoConverter:
         """Get all debug output as terminal-style text"""
         return "\n".join(self.debug_log)
 
+    def _get_elapsed_time(self):
+        """Get elapsed time since conversion started"""
+        import datetime
+        elapsed = datetime.datetime.now() - self.start_time
+        return f"{elapsed.total_seconds():.2f}s"
+
     def extract_zip(self, zip_path: str, extract_dir: str) -> str:
         """Extract and find main HTML file"""
-        self.update_progress(0.1, "📦 Extracting...")
-        st.info("📦 Extracting HTML5 archive...")
+        self.update_progress(0.1, "Extracting...")
+        self.log(f"=== ZIP EXTRACTION ===")
+        self.log(f"ZIP path: {zip_path}")
+        self.log(f"Extract to: {extract_dir}")
 
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            files = zip_ref.namelist()
+            self.log(f"ZIP contains {len(files)} files")
             zip_ref.extractall(extract_dir)
+            self.log(f"Extracted all files successfully")
 
         html_files = list(Path(extract_dir).rglob("*.html"))
+        self.log(f"Found {len(html_files)} HTML files")
 
         if not html_files:
+            self.log("ERROR: No HTML files found in archive")
             raise FileNotFoundError("No HTML files found in the archive")
 
         # Look for index.html or use first HTML file
         main_html = None
         for html_file in html_files:
+            self.log(f"  - {html_file.name}")
             if html_file.name.lower() in ['index.html', 'index.htm']:
                 main_html = html_file
                 break
@@ -163,7 +179,8 @@ class HTML5ToVideoConverter:
         if not main_html:
             main_html = html_files[0]
 
-        st.success(f"✅ Found: {main_html.name}")
+        self.log(f"Using main HTML: {main_html.name}")
+        self.log(f"Absolute path: {main_html.absolute()}")
         return str(main_html.absolute())
 
     def render_html_to_frames(self, html_path: str, output_dir: str, config: VideoConfig) -> Optional[str]:
@@ -184,8 +201,10 @@ class HTML5ToVideoConverter:
         self.log(f"=== HTML5 TO VIDEO RENDERING ===")
         self.log(f"Target dimensions: {target_width}x{target_height} (even-adjusted from {config.width}x{config.height})")
         self.log(f"Total frames: {total_frames} ({config.fps} FPS × {config.duration}s)")
+        self.log(f"Frame time: {frame_time_s:.4f}s per frame")
 
         # Chrome options - REQUIREMENT #1: Set window size in chrome_options
+        self.log(f"=== BROWSER INITIALIZATION ===")
         chrome_options = Options()
         chrome_options.add_argument('--headless=new')
         chrome_options.add_argument('--no-sandbox')
@@ -195,9 +214,9 @@ class HTML5ToVideoConverter:
         chrome_options.add_argument('--force-device-scale-factor=1')
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
         # Add extra height for browser chrome in headless mode
-        chrome_options.add_argument(f'--window-size={target_width},{target_height + 100}')
-
-        st.info(f"Chrome window-size: {target_width}x{target_height + 100}")
+        window_size = f'{target_width},{target_height + 100}'
+        chrome_options.add_argument(f'--window-size={window_size}')
+        self.log(f"Chrome --window-size: {window_size}")
 
         # Find browser binary
         browser_paths = [
@@ -209,14 +228,21 @@ class HTML5ToVideoConverter:
             "/usr/bin/google-chrome"
         ]
 
+        browser_found = None
         for path in browser_paths:
             if os.path.exists(path):
                 chrome_options.binary_location = path
-                st.info(f"Using browser: {os.path.basename(path)}")
+                browser_found = path
+                self.log(f"Found browser: {path}")
                 break
 
+        if not browser_found:
+            self.log("WARNING: No browser binary found, using system default")
+
         try:
+            self.log("Creating WebDriver instance...")
             driver = webdriver.Chrome(options=chrome_options)
+            self.log("WebDriver created successfully")
         except Exception as e:
             st.error(f"Browser error: {e}")
             st.info("Make sure packages.txt includes: chromium, chromium-driver")
@@ -226,14 +252,18 @@ class HTML5ToVideoConverter:
 
         try:
             # REQUIREMENT #2: Set window size via Selenium (in addition to chrome_options)
+            self.log(f"=== PAGE LOADING ===")
             driver.set_window_size(target_width, target_height + 100)
-            st.info(f"Selenium set_window_size: {target_width}x{target_height + 100}")
+            self.log(f"Selenium set_window_size called: {target_width}x{target_height + 100}")
 
             # Load HTML
             file_url = f"file://{html_path}"
+            self.log(f"Loading URL: {file_url}")
             driver.get(file_url)
+            self.log(f"Page loaded")
 
             # REQUIREMENT #3: Force document and body to EXACT dimensions via JavaScript
+            self.log(f"=== APPLYING JAVASCRIPT RESIZE ===")
             js_resize = f"""
                 document.documentElement.style.margin = '0';
                 document.documentElement.style.padding = '0';
@@ -258,10 +288,12 @@ class HTML5ToVideoConverter:
                 }}
             """
             driver.execute_script(js_resize)
-            st.info("JavaScript resize applied")
+            self.log("JavaScript resize script executed")
 
             # REQUIREMENT #4: Delay for page to settle
+            self.log("Waiting 1.5s for page to settle...")
             time.sleep(1.5)
+            self.log("Wait complete")
 
             # REQUIREMENT #5: Log detected, requested, and actual dimensions
             actual_viewport_w = driver.execute_script("return window.innerWidth;")
@@ -282,7 +314,11 @@ class HTML5ToVideoConverter:
                 self.log(f"WARNING: Viewport mismatch! Expected {target_width}x{target_height}, got {actual_viewport_w}x{actual_viewport_h}")
 
             # Capture frames
-            st.info(f"Capturing {total_frames} frames at {config.fps} FPS...")
+            self.log(f"=== FRAME CAPTURE ===")
+            self.log(f"Total frames to capture: {total_frames}")
+            self.log(f"Frame rate: {config.fps} FPS")
+            self.log(f"Duration: {config.duration}s")
+            self.log(f"Time between frames: {frame_time_s:.4f}s")
             self.update_progress(0.3, "Capturing frames...")
 
             progress_bar = st.progress(0)
@@ -300,6 +336,8 @@ class HTML5ToVideoConverter:
                 temp_screenshot = frame_path + ".tmp.png"
 
                 # Take screenshot
+                if frame_num == 0 or frame_num % 10 == 0 or frame_num == total_frames - 1:
+                    self.log(f"Capturing frame {frame_num + 1}/{total_frames}")
                 driver.save_screenshot(temp_screenshot)
 
                 # REQUIREMENT #6: If wrong size, crop/resize to match and continue
@@ -348,13 +386,18 @@ class HTML5ToVideoConverter:
                         with Image.open(frame_path) as fixed_img:
                             fixed_img.save(debug_frame)
                             final_w, final_h = fixed_img.size
-                            st.info(f"Debug frame saved: frame_fixed.png ({final_w}x{final_h})")
-                            if final_w == target_width and final_h == target_height:
-                                st.success(f"Dimensions match target!")
-                            else:
-                                st.error(f"Dimension mismatch! Expected {target_width}x{target_height}")
+                            self.log(f"=== DEBUG FRAME OUTPUT ===")
+                            self.log(f"Saved: frame_fixed.png")
+                            self.log(f"Final dimensions: {final_w}x{final_h}")
+                            match = "YES" if final_w == target_width and final_h == target_height else "NO"
+                            self.log(f"Dimensions match target: {match}")
+                            if match == "NO":
+                                self.log(f"ERROR: Expected {target_width}x{target_height}, got {final_w}x{final_h}")
 
                 os.unlink(temp_screenshot)
+
+                if frame_num == 0 or frame_num % 10 == 0 or frame_num == total_frames - 1:
+                    self.log(f"Frame {frame_num + 1} saved: {os.path.basename(frame_path)}")
 
                 progress = (frame_num + 1) / total_frames
                 progress_bar.progress(progress)
@@ -362,46 +405,65 @@ class HTML5ToVideoConverter:
 
                 time.sleep(frame_time_s)
 
+            self.log(f"=== FRAME CAPTURE COMPLETE ===")
+            self.log(f"Total frames captured: {total_frames}")
+            self.log(f"Frames directory: {frames_dir}")
+
             driver.quit()
+            self.log("Browser closed")
             progress_bar.empty()
             status_text.empty()
-            st.success("Frame capture complete")
 
         except Exception as e:
+            self.log(f"=== RENDERING ERROR ===")
+            self.log(f"Exception type: {type(e).__name__}")
+            self.log(f"Exception message: {str(e)}")
+            import traceback
+            self.log(f"Traceback:\n{traceback.format_exc()}")
             st.error(f"Rendering error: {e}")
             try:
                 driver.quit()
+                self.log("Browser closed after error")
             except:
-                pass
+                self.log("Failed to close browser")
             return None
 
         return frames_dir
 
     def encode_video(self, frames_dir: str, output_path: str, config: VideoConfig) -> bool:
         """Encode frames to video using FFmpeg"""
-        st.info("🎥 Encoding video with FFmpeg...")
+        self.log(f"=== VIDEO ENCODING ===")
+        self.log(f"Frames directory: {frames_dir}")
+        self.log(f"Output path: {output_path}")
 
         input_pattern = os.path.join(frames_dir, "frame_%06d.png")
+        self.log(f"Input pattern: {input_pattern}")
 
         # Check if frames exist first
         frame_files = sorted([f for f in os.listdir(frames_dir) if f.endswith('.png')])
+        self.log(f"Checking for frames in: {frames_dir}")
+        self.log(f"Found {len(frame_files)} PNG files")
+
         if not frame_files:
-            st.error("❌ No frames found to encode!")
+            self.log("ERROR: No frames found to encode!")
+            st.error("No frames found to encode!")
             return False
 
-        st.info(f"🎬 Found {len(frame_files)} frames to encode")
-        self.update_progress(0.75, "🎬 Encoding video...")
+        self.log(f"Frame files: {frame_files[0]} ... {frame_files[-1]}")
+        self.update_progress(0.75, "Encoding video...")
 
         # Get frame dimensions and ensure they're even (H.264 requirement)
         from PIL import Image
         first_frame_path = os.path.join(frames_dir, frame_files[0])
+        self.log(f"=== DIMENSION CHECK ===")
+        self.log(f"Reading first frame: {frame_files[0]}")
         needs_scaling = False
         scale_filter = ""
 
         try:
             with Image.open(first_frame_path) as img:
                 frame_width, frame_height = img.size
-                st.info(f"📐 Captured frame size: {frame_width}x{frame_height}")
+                self.log(f"Captured frame size: {frame_width}x{frame_height}")
 
                 # H.264 requires even dimensions
                 adjusted_width = frame_width
@@ -410,26 +472,37 @@ class HTML5ToVideoConverter:
                 if frame_width % 2 != 0:
                     adjusted_width = frame_width - 1
                     needs_scaling = True
+                    self.log(f"Width is odd ({frame_width}), will adjust to {adjusted_width}")
 
                 if frame_height % 2 != 0:
                     adjusted_height = frame_height - 1
                     needs_scaling = True
+                    self.log(f"Height is odd ({frame_height}), will adjust to {adjusted_height}")
 
                 if needs_scaling:
-                    st.warning(f"⚠️ Odd dimensions detected! Will adjust: {frame_width}x{frame_height} → {adjusted_width}x{adjusted_height}")
+                    self.log(f"Odd dimensions detected - will scale: {frame_width}x{frame_height} → {adjusted_width}x{adjusted_height}")
                     scale_filter = f"-vf scale={adjusted_width}:{adjusted_height}:flags=lanczos"
+                    self.log(f"Scale filter: {scale_filter}")
                 else:
-                    st.success(f"✅ Dimensions are even - no scaling needed!")
+                    self.log(f"Dimensions are even - no scaling needed")
 
         except Exception as e:
-            st.error(f"⚠️ Could not read frame: {e}")
+            self.log(f"ERROR: Could not read frame: {e}")
             # Fallback - assume we need basic dimensions
             adjusted_width = config.width if config.width % 2 == 0 else config.width - 1
             adjusted_height = config.height if config.height % 2 == 0 else config.height - 1
             scale_filter = f"-vf scale={adjusted_width}:{adjusted_height}:flags=lanczos"
             needs_scaling = True
+            self.log(f"Using fallback dimensions: {adjusted_width}x{adjusted_height}")
 
         # Build FFmpeg command with maximum compatibility
+        self.log(f"=== BUILDING FFMPEG COMMAND ===")
+        self.log(f"Codec: {config.codec}")
+        self.log(f"FPS: {config.fps}")
+        self.log(f"CRF: {config.crf}")
+        self.log(f"Preset: {config.preset}")
+        self.log(f"Bitrate: {config.bitrate}")
+
         ffmpeg_cmd = [
             "ffmpeg",
             "-y",  # Overwrite output
@@ -440,6 +513,7 @@ class HTML5ToVideoConverter:
         # Only add scale filter if needed
         if needs_scaling:
             ffmpeg_cmd.extend(scale_filter.split())
+            self.log(f"Added scale filter to command")
 
         ffmpeg_cmd.extend([
             "-c:v", config.codec,
@@ -453,17 +527,21 @@ class HTML5ToVideoConverter:
             # Use faster preset for cloud compatibility
             if config.preset in ["veryslow", "slower", "slow"]:
                 ffmpeg_cmd.extend(["-preset", "medium"])  # Override slow presets
+                self.log(f"Preset '{config.preset}' overridden to 'medium' for cloud compatibility")
             else:
                 ffmpeg_cmd.extend(["-preset", config.preset])
         elif config.codec == "libvpx-vp9":
             ffmpeg_cmd.extend(["-b:v", config.bitrate])
             ffmpeg_cmd.extend(["-crf", str(config.crf)])
+            self.log(f"Using VP9 codec with bitrate and CRF")
         else:
             # For other codecs, use simple bitrate
             ffmpeg_cmd.extend(["-b:v", config.bitrate])
+            self.log(f"Using simple bitrate for codec: {config.codec}")
 
         # Add universal compatibility flags
         ffmpeg_cmd.extend(["-movflags", "+faststart"])
+        self.log(f"Added faststart flag for web compatibility")
 
         # Add output path
         ffmpeg_cmd.append(output_path)
@@ -471,8 +549,9 @@ class HTML5ToVideoConverter:
         try:
             # Log FFmpeg command
             ffmpeg_command_str = " ".join(ffmpeg_cmd)
-            self.log(f"=== FFMPEG COMMAND ===")
-            self.log(ffmpeg_command_str)
+            self.log(f"=== FFMPEG EXECUTION ===")
+            self.log(f"Command: {ffmpeg_command_str}")
+            self.log("Starting FFmpeg process...")
 
             process = subprocess.Popen(
                 ffmpeg_cmd,
@@ -481,34 +560,36 @@ class HTML5ToVideoConverter:
                 universal_newlines=True
             )
 
+            self.log(f"FFmpeg process started (PID: {process.pid})")
+            self.log("Waiting for FFmpeg to complete...")
+
             # Capture output
             stdout, stderr = process.communicate()
+
+            self.log(f"FFmpeg process finished (exit code: {process.returncode})")
 
             if process.returncode == 0:
                 self.log(f"=== FFMPEG OUTPUT ===")
                 for line in stderr.strip().split('\n'):
                     if line.strip():
                         self.log(line)
+                self.log("=== ENCODING SUCCESS ===")
                 self.log("Video encoding complete (exit code 0)")
                 return True
             else:
-                # Show detailed error
-                st.error(f"❌ FFmpeg error (exit code {process.returncode})")
+                # Log detailed error
+                self.log(f"=== FFMPEG ERROR ===")
+                self.log(f"Exit code: {process.returncode}")
+                self.log(f"STDERR output:")
+                for line in stderr.strip().split('\n'):
+                    if line.strip():
+                        self.log(line)
 
-                # Show last few lines of error output
-                error_lines = stderr.strip().split('\n')
-                relevant_errors = [line for line in error_lines if 'error' in line.lower() or 'invalid' in line.lower()]
-
-                if relevant_errors:
-                    with st.expander("Show error details"):
-                        for line in relevant_errors[-5:]:
-                            st.code(line, language="text")
-                else:
-                    with st.expander("Show FFmpeg output"):
-                        st.code(stderr[-2000:], language="text")  # Last 2000 chars
+                st.error(f"FFmpeg error (exit code {process.returncode})")
 
                 # Try fallback with minimal parameters
-                st.warning("⚠️ Trying fallback encoding with minimal parameters...")
+                self.log("=== ATTEMPTING FALLBACK ENCODING ===")
+                self.log("Primary encoding failed, trying fallback with minimal parameters...")
 
                 # Get actual frame dimensions from first frame
                 try:
@@ -519,24 +600,31 @@ class HTML5ToVideoConverter:
                         # Ensure even dimensions
                         fw = fw if fw % 2 == 0 else fw - 1
                         fh = fh if fh % 2 == 0 else fh - 1
-                except:
+                        self.log(f"Fallback dimensions from frame: {fw}x{fh}")
+                except Exception as e:
                     fw, fh = 1280, 720  # Safe default
+                    self.log(f"Could not read frame for fallback: {e}")
+                    self.log(f"Using safe default: {fw}x{fh}")
+
+                fallback_fps = min(config.fps, 30)
+                self.log(f"Fallback FPS: {fallback_fps} (capped at 30)")
 
                 fallback_cmd = [
                     "ffmpeg", "-y",
-                    "-framerate", str(min(config.fps, 30)),  # Cap at 30fps for compatibility
+                    "-framerate", str(fallback_fps),
                     "-i", input_pattern,
-                    "-vf", f"scale={fw}:{fh}:flags=lanczos",  # Ensure even dimensions
+                    "-vf", f"scale={fw}:{fh}:flags=lanczos",
                     "-c:v", "libx264",
                     "-pix_fmt", "yuv420p",
-                    "-profile:v", "baseline",  # Most compatible profile
+                    "-profile:v", "baseline",
                     "-level", "3.0",
-                    "-r", str(min(config.fps, 30)),  # Output framerate
+                    "-r", str(fallback_fps),
                     output_path
                 ]
 
-                with st.expander("Fallback FFmpeg command"):
-                    st.code(" ".join(fallback_cmd), language="bash")
+                fallback_cmd_str = " ".join(fallback_cmd)
+                self.log(f"Fallback command: {fallback_cmd_str}")
+                self.log("Starting fallback FFmpeg process...")
 
                 fallback_process = subprocess.Popen(
                     fallback_cmd,
@@ -545,58 +633,97 @@ class HTML5ToVideoConverter:
                     universal_newlines=True
                 )
 
+                self.log(f"Fallback process started (PID: {fallback_process.pid})")
                 fallback_stdout, fallback_stderr = fallback_process.communicate()
+                self.log(f"Fallback process finished (exit code: {fallback_process.returncode})")
 
                 if fallback_process.returncode == 0:
-                    st.success("✅ Fallback encoding succeeded!")
-                    st.info("Note: Used baseline profile for maximum compatibility")
+                    self.log("=== FALLBACK SUCCESS ===")
+                    self.log("Fallback encoding succeeded using baseline profile")
+                    for line in fallback_stderr.strip().split('\n'):
+                        if line.strip():
+                            self.log(line)
                     return True
                 else:
-                    st.error("❌ Fallback encoding also failed")
-                    with st.expander("Fallback error details"):
-                        st.code(fallback_stderr[-1000:], language="text")
+                    self.log("=== FALLBACK FAILED ===")
+                    self.log(f"Fallback exit code: {fallback_process.returncode}")
+                    self.log("Fallback STDERR:")
+                    for line in fallback_stderr.strip().split('\n'):
+                        if line.strip():
+                            self.log(line)
+                    st.error("Fallback encoding also failed")
                     return False
 
         except FileNotFoundError:
-            st.error("❌ FFmpeg not found. Please install FFmpeg.")
+            self.log("=== FFMPEG NOT FOUND ===")
+            self.log("FileNotFoundError: FFmpeg executable not found in PATH")
+            self.log("Please install FFmpeg or check packages.txt on Streamlit Cloud")
+            st.error("FFmpeg not found. Please install FFmpeg.")
             st.info("On Streamlit Cloud, make sure 'packages.txt' includes 'ffmpeg'")
             return False
         except Exception as e:
-            st.error(f"❌ Encoding error: {e}")
+            self.log("=== ENCODING EXCEPTION ===")
+            self.log(f"Exception type: {type(e).__name__}")
+            self.log(f"Exception message: {str(e)}")
             import traceback
-            with st.expander("Show error details"):
-                st.code(traceback.format_exc(), language="text")
+            self.log(f"Traceback:\n{traceback.format_exc()}")
+            st.error(f"Encoding error: {e}")
             return False
 
     def convert(self, zip_path: str, output_path: str, config: VideoConfig) -> bool:
         """Main conversion pipeline"""
+        self.log("=== CONVERSION PIPELINE START ===")
+        self.log(f"Input ZIP: {zip_path}")
+        self.log(f"Output video: {output_path}")
+
         temp_dir = tempfile.mkdtemp(prefix="html5_to_video_")
+        self.log(f"Created temp directory: {temp_dir}")
 
         try:
+            self.log("=== STEP 1: EXTRACT ZIP ===")
             html_path = self.extract_zip(zip_path, temp_dir)
             if not html_path:
+                self.log("ERROR: ZIP extraction failed")
                 return False
+            self.log(f"ZIP extraction successful: {html_path}")
 
+            self.log("=== STEP 2: RENDER HTML TO FRAMES ===")
             frames_dir = self.render_html_to_frames(html_path, temp_dir, config)
             if not frames_dir:
+                self.log("ERROR: Frame rendering failed")
                 return False
+            self.log(f"Frame rendering successful: {frames_dir}")
 
+            self.log("=== STEP 3: ENCODE VIDEO ===")
             success = self.encode_video(frames_dir, output_path, config)
 
             if success:
                 file_size = os.path.getsize(output_path) / (1024 * 1024)
-                st.success(f"🎉 Success! Video size: {file_size:.2f} MB")
+                self.log(f"=== CONVERSION COMPLETE ===")
+                self.log(f"Output video: {output_path}")
+                self.log(f"File size: {file_size:.2f} MB")
+                self.log(f"Total conversion time: {self._get_elapsed_time()}")
+            else:
+                self.log("ERROR: Video encoding failed")
 
             return success
 
         except Exception as e:
-            st.error(f"❌ Error: {e}")
+            self.log("=== CONVERSION EXCEPTION ===")
+            self.log(f"Exception type: {type(e).__name__}")
+            self.log(f"Exception message: {str(e)}")
+            import traceback
+            self.log(f"Traceback:\n{traceback.format_exc()}")
+            st.error(f"Error: {e}")
             return False
         finally:
             try:
+                self.log("=== CLEANUP ===")
+                self.log(f"Removing temp directory: {temp_dir}")
                 shutil.rmtree(temp_dir)
-            except:
-                pass
+                self.log("Cleanup complete")
+            except Exception as cleanup_error:
+                self.log(f"Cleanup error: {cleanup_error}")
 
 
 def get_download_link(file_path: str, filename: str) -> str:
@@ -872,22 +999,19 @@ def main():
                     if message:
                         status_text.text(message)
 
-                # Run conversion (st.info/success messages hidden in expander)
+                # Run conversion
                 converter = HTML5ToVideoConverter(progress_callback=update_progress)
-
-                # Hide all st messages by running in expander
-                with st.expander("⚠️ Status messages", expanded=False):
-                    success = converter.convert(temp_zip.name, output_file.name, config)
+                success = converter.convert(temp_zip.name, output_file.name, config)
 
                 # Complete
                 progress_bar.progress(1.0)
                 status_text.success("Complete")
 
-                # Show terminal-style debug output
+                # Show terminal-style debug output (complete log)
                 with st.expander("Debug Details", expanded=False):
                     debug_output = converter.get_debug_output()
                     st.code(debug_output, language="text")
-                    st.caption("↑ Raw debug output (copy entire log)")
+                    st.caption("↑ Complete process log (copy entire log)")
 
                 if success and os.path.exists(output_file.name):
                     # Update right column with video preview and download
