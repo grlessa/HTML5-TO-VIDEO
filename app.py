@@ -406,83 +406,37 @@ class HTML5ToVideoConverter:
                     driver.quit()
                     return None
 
-                # IMPORTANT: Advance animations BEFORE taking screenshot
+                # IMPORTANT: Let CSS animations run naturally by actually waiting
                 if frame_num > 0:
-                    # Calculate elapsed time for this frame
-                    elapsed_time = frame_num * frame_time_s
-                    elapsed_ms = int(elapsed_time * 1000)
+                    # Simply wait for the frame time - let CSS animations progress naturally
+                    time.sleep(frame_time_s)
 
                     if frame_num % 30 == 0:  # Log every 30 frames
-                        self.log(f"Advancing animation to {elapsed_time:.2f}s (frame {frame_num})")
+                        elapsed_time = frame_num * frame_time_s
+                        self.log(f"Animation at {elapsed_time:.2f}s (frame {frame_num})")
 
-                    # Advance CSS animations by manipulating animation-delay
+                    # For JavaScript-based animations, update time reference
+                    elapsed_ms = int(frame_num * frame_time_s * 1000)
                     driver.execute_script(f"""
-                        var timeOffset = -{elapsed_ms};
-
-                        // Method 1: Manipulate CSS animation time using animation-delay
-                        var styleSheet = document.createElement('style');
-                        styleSheet.innerHTML = `
-                            * {{
-                                animation-delay: ${{timeOffset}}ms !important;
-                                transition-delay: ${{timeOffset}}ms !important;
-                            }}
-                        `;
-                        if (!window.__animStyleSheet) {{
-                            document.head.appendChild(styleSheet);
-                            window.__animStyleSheet = styleSheet;
-                        }} else {{
-                            window.__animStyleSheet.innerHTML = styleSheet.innerHTML;
-                        }}
-
-                        // Method 2: For JavaScript animations, update time reference
-                        if (!window.__originalDateNow) {{
-                            window.__originalDateNow = Date.now;
+                        // Update time for JavaScript animations
+                        if (!window.__animationStartTime) {{
                             window.__animationStartTime = Date.now();
                         }}
 
-                        // Override Date.now() to return offset time
-                        Date.now = function() {{
-                            return window.__animationStartTime + {elapsed_ms};
-                        }};
-
-                        // Override performance.now() similarly
-                        if (window.performance && !window.__originalPerformanceNow) {{
-                            window.__originalPerformanceNow = performance.now.bind(performance);
-                        }}
-                        if (window.performance) {{
-                            performance.now = function() {{
-                                return {elapsed_ms};
-                            }};
-                        }}
-
-                        // Method 3: CreateJS time control (for HTML5 ads)
+                        // CreateJS support (for HTML5 banner ads)
                         if (typeof createjs !== 'undefined' && createjs.Ticker) {{
-                            console.log('Advancing CreateJS ticker to {elapsed_ms}ms');
-                            // Manually tick the CreateJS ticker
-                            var ticksNeeded = Math.floor({elapsed_ms} / (1000 / 30)); // Assuming 30fps
-                            for (var i = 0; i < ticksNeeded; i++) {{
-                                createjs.Ticker._tick();
-                            }}
+                            createjs.Ticker._tick();
                         }}
 
-                        // Method 4: GSAP time control
+                        // GSAP support (update global timeline)
                         if (typeof gsap !== 'undefined' && gsap.globalTimeline) {{
-                            console.log('Advancing GSAP timeline to {elapsed_time}s');
-                            gsap.globalTimeline.time({elapsed_time});
+                            // GSAP handles its own time, just trigger update
+                            gsap.ticker.tick();
                         }}
 
-                        // Method 5: Trigger animation updates
-                        window.dispatchEvent(new Event('resize'));
-                        document.body.offsetHeight; // Force reflow
-
-                        // Trigger RAF if animation loop exists
-                        if (window.requestAnimationFrame) {{
-                            window.requestAnimationFrame(function() {{}});
-                        }}
+                        // Force reflow for CSS animations
+                        document.body.offsetHeight;
                     """)
-
-                    # Give browser time to process the time change
-                    time.sleep(0.05)  # 50ms for browser to update
 
                 frame_path = os.path.join(frames_dir, f"frame_{frame_num:06d}.png")
                 temp_screenshot = frame_path + ".tmp.png"
