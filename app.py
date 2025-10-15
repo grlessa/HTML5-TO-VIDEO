@@ -237,25 +237,41 @@ class HTML5ToVideoConverter:
         input_pattern = os.path.join(frames_dir, "frame_%06d.png")
 
         # Build FFmpeg command with better compatibility
+        # Note: CRF and bitrate should NOT be used together - CRF is constant quality, bitrate is constant bitrate
         ffmpeg_cmd = [
             "ffmpeg",
             "-y",  # Overwrite output
             "-framerate", str(config.fps),
             "-i", input_pattern,
             "-c:v", config.codec,
+            "-pix_fmt", "yuv420p",
         ]
 
-        # Add preset only for x264/x265 codecs
+        # Add preset and quality settings for x264/x265 codecs
         if config.codec in ["libx264", "libx265"]:
             ffmpeg_cmd.extend(["-preset", config.preset])
+            # Use CRF mode (constant quality) - better than bitrate
             ffmpeg_cmd.extend(["-crf", str(config.crf)])
+            # Add maxrate for compatibility (soft limit)
+            ffmpeg_cmd.extend(["-maxrate", config.bitrate])
+            # Calculate buffer size (2x maxrate)
+            try:
+                bitrate_val = int(config.bitrate.replace('M', '').replace('K', '').replace('k', ''))
+                if 'M' in config.bitrate or 'm' in config.bitrate:
+                    bufsize = f"{bitrate_val * 2}M"
+                else:
+                    bufsize = f"{bitrate_val * 2}k"
+            except:
+                bufsize = "20M"  # Default fallback
+            ffmpeg_cmd.extend(["-bufsize", bufsize])
+        else:
+            # For other codecs, use bitrate mode
+            ffmpeg_cmd.extend(["-b:v", config.bitrate])
 
-        # Add bitrate and other settings
+        # Add final options
         ffmpeg_cmd.extend([
-            "-b:v", config.bitrate,
-            "-pix_fmt", "yuv420p",
             "-movflags", "+faststart",
-            "-vf", "format=yuv420p",  # Ensure compatibility
+            "-strict", "experimental",  # Allow experimental features if needed
         ])
 
         # Add output path
