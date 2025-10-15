@@ -118,11 +118,18 @@ class HTML5Analyzer:
 class HTML5ToVideoConverter:
     """Main converter class"""
 
-    def __init__(self):
+    def __init__(self, progress_callback=None):
         self.cancelled = False
+        self.progress_callback = progress_callback
+
+    def update_progress(self, value, message=None):
+        """Update external progress if callback provided"""
+        if self.progress_callback:
+            self.progress_callback(value, message)
 
     def extract_zip(self, zip_path: str, extract_dir: str) -> str:
         """Extract and find main HTML file"""
+        self.update_progress(0.1, "📦 Extracting...")
         st.info("📦 Extracting HTML5 archive...")
 
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
@@ -148,6 +155,7 @@ class HTML5ToVideoConverter:
 
     def render_html_to_frames(self, html_path: str, output_dir: str, config: VideoConfig) -> Optional[str]:
         """Render HTML to frames using Selenium"""
+        self.update_progress(0.2, "🌐 Loading browser...")
         st.info("🎬 Initializing browser...")
 
         frames_dir = os.path.join(output_dir, "frames")
@@ -243,6 +251,7 @@ class HTML5ToVideoConverter:
             st.info(f"✅ Final viewport: {viewport_w}x{viewport_h}")
 
             st.info(f"📸 Capturing {total_frames} frames at {config.fps} FPS...")
+            self.update_progress(0.3, f"📸 Capturing frames...")
 
             progress_bar = st.progress(0)
             status_text = st.empty()
@@ -253,6 +262,9 @@ class HTML5ToVideoConverter:
             use_element_screenshot = False
 
             for frame_num in range(total_frames):
+                # Update external progress proportionally (30% to 70% for capture phase)
+                frame_progress = 0.3 + (0.4 * (frame_num + 1) / total_frames)
+                self.update_progress(frame_progress, f"📸 Frame {frame_num + 1}/{total_frames}")
                 if self.cancelled:
                     driver.quit()
                     return None
@@ -326,6 +338,7 @@ class HTML5ToVideoConverter:
             return False
 
         st.info(f"🎬 Found {len(frame_files)} frames to encode")
+        self.update_progress(0.75, "🎬 Encoding video...")
 
         # Get frame dimensions and ensure they're even (H.264 requirement)
         from PIL import Image
@@ -697,43 +710,22 @@ def main():
             help="ZIP file containing HTML, CSS, JS, images, and all assets"
         )
 
-        # Settings section
-        st.markdown("### ⚙️ Settings")
-
+        # Simple settings toggle
         mode = st.radio(
-            "Mode",
-            ["🤖 Auto (Recommended)", "🎛️ Manual"],
-            help="Auto mode detects optimal settings from your HTML5 content",
-            horizontal=True
+            "",
+            ["Auto", "Manual"],
+            horizontal=True,
+            label_visibility="collapsed"
         )
 
-        if mode == "🎛️ Manual":
-            with st.expander("📐 Video Configuration", expanded=True):
-                col1, col2 = st.columns(2)
-                with col1:
-                    width = st.number_input("Width (px)", 100, 7680, 1920)
-                    fps = st.number_input("FPS", 1, 120, 60)
-                with col2:
-                    height = st.number_input("Height (px)", 100, 4320, 1080)
-                    duration = st.number_input("Duration (s)", 1, 3600, 10)
-
-            with st.expander("🎨 Quality Settings", expanded=False):
-                codec = st.selectbox(
-                    "Codec",
-                    ["libx264", "libx265", "libvpx-vp9", "prores_ks"],
-                    help="H.264 recommended for compatibility"
-                )
-
-                preset = st.selectbox(
-                    "Preset",
-                    ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"],
-                    index=6,
-                    help="Slower = better quality"
-                )
-
-                crf = st.slider("CRF (Quality)", 0, 51, 18, help="Lower = better quality (18 recommended)")
-
-                bitrate = st.text_input("Bitrate", "10M", help="e.g., 5M, 10M, 20M")
+        if mode == "Manual":
+            col1, col2 = st.columns(2)
+            with col1:
+                width = st.number_input("Width", 100, 7680, 1920)
+                fps = st.number_input("FPS", 1, 120, 60)
+            with col2:
+                height = st.number_input("Height", 100, 4320, 1080)
+                duration = st.number_input("Duration", 1, 3600, 10)
 
     # Right column: Preview area (placeholder initially)
     with right_col:
@@ -753,7 +745,7 @@ def main():
             temp_zip.close()
 
             # Auto-detect if in auto mode
-            if mode == "🤖 Auto (Recommended)":
+            if mode == "Auto":
                 with st.spinner("🔍 Analyzing HTML5 content..."):
                     temp_extract = tempfile.mkdtemp()
                     with zipfile.ZipFile(temp_zip.name, 'r') as zip_ref:
@@ -782,18 +774,18 @@ def main():
                         col1.metric("Resolution", f"{width}x{height}")
                         col2.metric("FPS", fps)
                         col3.metric("Duration", f"{duration}s")
-                        col4.metric("Quality", "High (CRF 18)")
+                        col4.metric("Quality", "Lossless")
 
-                        # Use optimal settings
+                        # Use optimal settings for maximum quality
                         codec = "libx264"
-                        preset = "slow"
-                        crf = 18
-                        bitrate = "10M"
+                        preset = "veryslow"
+                        crf = 0  # Lossless quality
+                        bitrate = "50M"
 
                     else:
                         st.warning("⚠️ No HTML files found, using defaults")
                         width, height, fps, duration = 1920, 1080, 60, 10
-                        codec, preset, crf, bitrate = "libx264", "slow", 18, "10M"
+                        codec, preset, crf, bitrate = "libx264", "veryslow", 0, "50M"
 
                     shutil.rmtree(temp_extract)
 
@@ -813,9 +805,24 @@ def main():
                     crf=crf
                 )
 
-                # Run conversion with detailed progress
-                converter = HTML5ToVideoConverter()
-                success = converter.convert(temp_zip.name, output_file.name, config)
+                # Simple progress bar and status
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+
+                # Progress callback to update simple indicators
+                def update_progress(value, message=None):
+                    progress_bar.progress(value)
+                    if message:
+                        status_text.text(message)
+
+                # All detailed output in collapsible debug section
+                with st.expander("🔍 Debug Details", expanded=False):
+                    converter = HTML5ToVideoConverter(progress_callback=update_progress)
+                    success = converter.convert(temp_zip.name, output_file.name, config)
+
+                # Complete
+                progress_bar.progress(1.0)
+                status_text.success("✅ Complete!")
 
                 if success and os.path.exists(output_file.name):
                     st.balloons()
