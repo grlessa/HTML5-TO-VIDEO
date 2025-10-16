@@ -30,6 +30,8 @@ class VideoConfig:
     bitrate: str = "10M"
     preset: str = "slow"
     crf: int = 18
+    enable_smart_upscaling: bool = False
+    target_format: str = "original"  # "original", "1080x1080", "1080x1920"
 
 
 class HTML5Analyzer:
@@ -115,6 +117,110 @@ class HTML5Analyzer:
             'fps': fps,
             'detected': animation_count > 0
         }
+
+
+class SmartUpscaler:
+    """Handles smart aspect ratio fitting and upscaling"""
+
+    @staticmethod
+    def calculate_fit_dimensions(source_w: int, source_h: int, target_w: int, target_h: int) -> dict:
+        """
+        Calculate dimensions to fit source into target without distortion.
+        Returns dict with fitted dimensions and padding.
+        """
+        source_aspect = source_w / source_h
+        target_aspect = target_w / target_h
+
+        if abs(source_aspect - target_aspect) < 0.01:
+            # Aspects are nearly identical, just scale
+            return {
+                'fit_width': target_w,
+                'fit_height': target_h,
+                'pad_top': 0,
+                'pad_bottom': 0,
+                'pad_left': 0,
+                'pad_right': 0,
+                'needs_padding': False
+            }
+
+        if source_aspect > target_aspect:
+            # Source is wider → fit width, add top/bottom bars
+            fit_width = target_w
+            fit_height = int(target_w / source_aspect)
+            # Ensure even dimensions
+            if fit_height % 2 != 0:
+                fit_height -= 1
+            pad_top = (target_h - fit_height) // 2
+            pad_bottom = target_h - fit_height - pad_top
+            return {
+                'fit_width': fit_width,
+                'fit_height': fit_height,
+                'pad_top': pad_top,
+                'pad_bottom': pad_bottom,
+                'pad_left': 0,
+                'pad_right': 0,
+                'needs_padding': True
+            }
+        else:
+            # Source is taller → fit height, add left/right bars
+            fit_height = target_h
+            fit_width = int(target_h * source_aspect)
+            # Ensure even dimensions
+            if fit_width % 2 != 0:
+                fit_width -= 1
+            pad_left = (target_w - fit_width) // 2
+            pad_right = target_w - fit_width - pad_left
+            return {
+                'fit_width': fit_width,
+                'fit_height': fit_height,
+                'pad_top': 0,
+                'pad_bottom': 0,
+                'pad_left': pad_left,
+                'pad_right': pad_right,
+                'needs_padding': True
+            }
+
+    @staticmethod
+    def get_ffmpeg_scale_filter(source_w: int, source_h: int, target_w: int, target_h: int,
+                                 enable_upscaling: bool = False) -> str:
+        """
+        Generate FFmpeg scale filter with smart fitting and optional advanced upscaling.
+        Uses lanczos for high quality, adds unsharp for crispness.
+        """
+        fit_info = SmartUpscaler.calculate_fit_dimensions(source_w, source_h, target_w, target_h)
+
+        # Calculate scale factor
+        scale_factor_w = target_w / source_w
+        scale_factor_h = target_h / source_h
+        scale_factor = max(scale_factor_w, scale_factor_h)
+
+        # Choose scaler based on scale factor and upscaling setting
+        if enable_upscaling and scale_factor > 1.5:
+            # Use spline36 for better upscaling (better than lanczos for large scales)
+            scaler = "spline36"
+            # Stronger sharpening for upscaled content
+            sharpen = "unsharp=7:7:1.5:7:7:0.0"
+        else:
+            # Use lanczos for normal scaling
+            scaler = "lanczos"
+            # Normal sharpening
+            sharpen = "unsharp=5:5:1.0:5:5:0.0"
+
+        if fit_info['needs_padding']:
+            # Scale to fit dimensions, then pad to target
+            filter_parts = [
+                f"scale={fit_info['fit_width']}:{fit_info['fit_height']}:flags={scaler}",
+                sharpen,
+                f"pad={target_w}:{target_h}:{fit_info['pad_left']}:{fit_info['pad_top']}:black"
+            ]
+            return ",".join(filter_parts)
+        else:
+            # Just scale and sharpen
+            filter_parts = [
+                f"scale={target_w}:{target_h}:flags={scaler}",
+                sharpen
+            ]
+            return ",".join(filter_parts)
 
 
 class HTML5ToVideoConverter:
@@ -673,7 +779,7 @@ class HTML5ToVideoConverter:
         self.log(f"Frame files: {frame_files[0]} ... {frame_files[-1]}")
         self.update_progress(0.75, "Encoding video...")
 
-        # Get frame dimensions and ensure they're even (H.264 requirement)
+        # Get frame dimensions and determine target dimensions
         from PIL import Image
         first_frame_path = os.path.join(frames_dir, frame_files[0])
         self.log(f"=== DIMENSION CHECK ===")
@@ -686,37 +792,72 @@ class HTML5ToVideoConverter:
                 frame_width, frame_height = img.size
                 self.log(f"Captured frame size: {frame_width}x{frame_height}")
 
-                # H.264 requires even dimensions
-                adjusted_width = frame_width
-                adjusted_height = frame_height
-
-                if frame_width % 2 != 0:
-                    adjusted_width = frame_width - 1
-                    needs_scaling = True
-                    self.log(f"Width is odd ({frame_width}), will adjust to {adjusted_width}")
-
-                if frame_height % 2 != 0:
-                    adjusted_height = frame_height - 1
-                    needs_scaling = True
-                    self.log(f"Height is odd ({frame_height}), will adjust to {adjusted_height}")
-
-                if needs_scaling:
-                    self.log(f"Odd dimensions detected - will scale: {frame_width}x{frame_height} → {adjusted_width}x{adjusted_height}")
-                    scale_filter = f"-vf scale={adjusted_width}:{adjusted_height}:flags=lanczos,unsharp=5:5:1.0:5:5:0.0"
-                    self.log(f"Scale filter with sharpen: {scale_filter}")
+                # Determine target dimensions based on config
+                if config.target_format == "1080x1080":
+                    target_width, target_height = 1080, 1080
+                    self.log(f"Target format: 1080x1080 (Square/Instagram)")
+                elif config.target_format == "1080x1920":
+                    target_width, target_height = 1080, 1920
+                    self.log(f"Target format: 1080x1920 (Vertical/Stories)")
                 else:
-                    self.log(f"Dimensions are even - adding sharpen filter only")
+                    # Original - just ensure even dimensions
+                    target_width = frame_width if frame_width % 2 == 0 else frame_width - 1
+                    target_height = frame_height if frame_height % 2 == 0 else frame_height - 1
+                    self.log(f"Target format: Original ({target_width}x{target_height})")
+
+                # Check if we need smart upscaling/fitting
+                if config.target_format in ["1080x1080", "1080x1920"]:
+                    # Use smart upscaler for fitting and scaling
+                    scale_factor = max(target_width / frame_width, target_height / frame_height)
+                    self.log(f"Scale factor: {scale_factor:.2f}x")
+
+                    if scale_factor > 1.5:
+                        self.log(f"Large upscale detected ({scale_factor:.2f}x) - using advanced scaler")
+
+                    scale_filter_str = SmartUpscaler.get_ffmpeg_scale_filter(
+                        frame_width, frame_height,
+                        target_width, target_height,
+                        enable_upscaling=config.enable_smart_upscaling
+                    )
+                    scale_filter = f"-vf {scale_filter_str}"
+                    needs_scaling = True
+                    self.log(f"Smart upscaling enabled: {frame_width}x{frame_height} → {target_width}x{target_height}")
+                    self.log(f"Filter: {scale_filter_str}")
+
+                    # Show fit details
+                    fit_info = SmartUpscaler.calculate_fit_dimensions(
+                        frame_width, frame_height, target_width, target_height
+                    )
+                    if fit_info['needs_padding']:
+                        self.log(f"Content will be fitted to {fit_info['fit_width']}x{fit_info['fit_height']}")
+                        if fit_info['pad_top'] > 0 or fit_info['pad_bottom'] > 0:
+                            self.log(f"Letterbox: {fit_info['pad_top']}px top, {fit_info['pad_bottom']}px bottom")
+                        if fit_info['pad_left'] > 0 or fit_info['pad_right'] > 0:
+                            self.log(f"Pillarbox: {fit_info['pad_left']}px left, {fit_info['pad_right']}px right")
+
+                elif frame_width != target_width or frame_height != target_height:
+                    # Simple resize with sharpen (original behavior)
+                    if config.enable_smart_upscaling:
+                        scale_filter = f"-vf scale={target_width}:{target_height}:flags=spline36,unsharp=7:7:1.5:7:7:0.0"
+                        self.log(f"Advanced upscaling: {frame_width}x{frame_height} → {target_width}x{target_height}")
+                    else:
+                        scale_filter = f"-vf scale={target_width}:{target_height}:flags=lanczos,unsharp=5:5:1.0:5:5:0.0"
+                        self.log(f"Standard scaling: {frame_width}x{frame_height} → {target_width}x{target_height}")
+                    needs_scaling = True
+                else:
+                    # No resize needed, just sharpen
+                    self.log(f"Dimensions match target - adding sharpen filter only")
                     scale_filter = "-vf unsharp=5:5:1.0:5:5:0.0"
-                    needs_scaling = True  # Flag to add filter
+                    needs_scaling = True
 
         except Exception as e:
             self.log(f"ERROR: Could not read frame: {e}")
-            # Fallback - assume we need basic dimensions
-            adjusted_width = config.width if config.width % 2 == 0 else config.width - 1
-            adjusted_height = config.height if config.height % 2 == 0 else config.height - 1
-            scale_filter = f"-vf scale={adjusted_width}:{adjusted_height}:flags=lanczos,unsharp=5:5:1.0:5:5:0.0"
+            # Fallback - use config dimensions
+            target_width = config.width if config.width % 2 == 0 else config.width - 1
+            target_height = config.height if config.height % 2 == 0 else config.height - 1
+            scale_filter = f"-vf scale={target_width}:{target_height}:flags=lanczos,unsharp=5:5:1.0:5:5:0.0"
             needs_scaling = True
-            self.log(f"Using fallback dimensions with sharpen: {adjusted_width}x{adjusted_height}")
+            self.log(f"Using fallback dimensions with sharpen: {target_width}x{target_height}")
 
         # Build FFmpeg command with maximum compatibility
         self.log(f"=== BUILDING FFMPEG COMMAND ===")
@@ -1130,7 +1271,28 @@ def main():
             label_visibility="collapsed"
         )
 
+        # Advanced settings expander (always visible)
+        with st.expander("⚙️ Advanced Settings", expanded=False):
+            # Output format selection
+            target_format = st.selectbox(
+                "Output Format",
+                ["Original (Source dimensions)", "1080x1080 (Square/Instagram)", "1080x1920 (Vertical/Stories)"],
+                help="Choose target aspect ratio. Content will be fitted without distortion."
+            )
+
+            # Smart upscaling toggle
+            enable_upscaling = st.checkbox(
+                "Enable Advanced Upscaling",
+                value=False,
+                help="Use spline36 scaler with enhanced sharpening for better quality when upscaling small sources (>1.5x scale factor). Slightly slower but much better quality."
+            )
+
+            if enable_upscaling:
+                st.info("💡 Advanced upscaling improves quality for small sources but may take ~20% longer to encode.")
+
+        # Manual mode settings
         if mode == "Manual":
+            st.markdown("**Manual Settings**")
             col1, col2 = st.columns(2)
             with col1:
                 width = st.number_input("Width", 100, 3840, 1920)  # Cap at 4K
@@ -1230,6 +1392,14 @@ def main():
                 output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
                 output_file.close()
 
+                # Map target format selection to config value
+                if "1080x1080" in target_format:
+                    target_format_value = "1080x1080"
+                elif "1080x1920" in target_format:
+                    target_format_value = "1080x1920"
+                else:
+                    target_format_value = "original"
+
                 config = VideoConfig(
                     width=width,
                     height=height,
@@ -1238,7 +1408,9 @@ def main():
                     codec=codec,
                     bitrate=bitrate,
                     preset=preset,
-                    crf=crf
+                    crf=crf,
+                    enable_smart_upscaling=enable_upscaling,
+                    target_format=target_format_value
                 )
 
                 # Simple progress bar and status
