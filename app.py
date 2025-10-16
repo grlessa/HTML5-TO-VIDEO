@@ -691,10 +691,18 @@ class HTML5ToVideoConverter:
                         self.log(f"Width diff: {screenshot_w - target_width:+d}px")
                         self.log(f"Height diff: {screenshot_h - target_height:+d}px")
 
-                        # Case 1: Larger or equal - crop it
+                        # Case 1: Larger or equal - crop it from center
                         if screenshot_w >= target_width and screenshot_h >= target_height:
-                            self.log(f"Action: CROP from top-left ({screenshot_w}x{screenshot_h} → {target_width}x{target_height})")
-                            corrected = img.crop((0, 0, target_width, target_height))
+                            # Calculate center crop coordinates
+                            left = (screenshot_w - target_width) // 2
+                            top = (screenshot_h - target_height) // 2
+                            right = left + target_width
+                            bottom = top + target_height
+
+                            self.log(f"Action: CENTER CROP ({screenshot_w}x{screenshot_h} → {target_width}x{target_height})")
+                            if left > 0 or top > 0:
+                                self.log(f"Crop offset: left={left}px, top={top}px")
+                            corrected = img.crop((left, top, right, bottom))
                             corrected.save(frame_path)
 
                         # Case 2: Smaller - resize it
@@ -711,7 +719,12 @@ class HTML5ToVideoConverter:
                     else:
                         # For subsequent frames, just do the correction without logging
                         if screenshot_w >= target_width and screenshot_h >= target_height:
-                            corrected = img.crop((0, 0, target_width, target_height))
+                            # Center crop for subsequent frames too
+                            left = (screenshot_w - target_width) // 2
+                            top = (screenshot_h - target_height) // 2
+                            right = left + target_width
+                            bottom = top + target_height
+                            corrected = img.crop((left, top, right, bottom))
                             corrected.save(frame_path)
                         elif screenshot_w < target_width or screenshot_h < target_height:
                             corrected = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
