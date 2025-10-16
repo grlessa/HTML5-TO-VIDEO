@@ -986,61 +986,19 @@ class HTML5ToVideoConverter:
                 frame_width, frame_height = img.size
                 self.log(f"Captured frame size: {frame_width}x{frame_height}")
 
-                # Determine target dimensions based on config
-                if config.target_format == "1080x1080":
-                    target_width, target_height = 1080, 1080
-                    self.log(f"Target format: 1080x1080 (Square/Instagram)")
-                elif config.target_format == "1080x1920":
-                    target_width, target_height = 1080, 1920
-                    self.log(f"Target format: 1080x1920 (Vertical/Stories)")
-                else:
-                    # Original - just ensure even dimensions
-                    target_width = frame_width if frame_width % 2 == 0 else frame_width - 1
-                    target_height = frame_height if frame_height % 2 == 0 else frame_height - 1
-                    self.log(f"Target format: Original ({target_width}x{target_height})")
+                # Frames are already rendered at target size by CSS injection
+                # Just ensure dimensions are even for H.264
+                target_width = frame_width if frame_width % 2 == 0 else frame_width - 1
+                target_height = frame_height if frame_height % 2 == 0 else frame_height - 1
 
-                # Check if we need smart upscaling/fitting
-                if config.target_format in ["1080x1080", "1080x1920"]:
-                    # Use smart upscaler for fitting and scaling
-                    scale_factor = max(target_width / frame_width, target_height / frame_height)
-                    self.log(f"Scale factor: {scale_factor:.2f}x")
-
-                    if scale_factor > 1.5:
-                        self.log(f"Large upscale detected ({scale_factor:.2f}x) - using advanced scaler")
-
-                    scale_filter_str = SmartUpscaler.get_ffmpeg_scale_filter(
-                        frame_width, frame_height,
-                        target_width, target_height,
-                        enable_upscaling=config.enable_smart_upscaling
-                    )
-                    scale_filter = f"-vf {scale_filter_str}"
-                    needs_scaling = True
-                    self.log(f"Smart upscaling enabled: {frame_width}x{frame_height} → {target_width}x{target_height}")
-                    self.log(f"Filter: {scale_filter_str}")
-
-                    # Show fit details
-                    fit_info = SmartUpscaler.calculate_fit_dimensions(
-                        frame_width, frame_height, target_width, target_height
-                    )
-                    if fit_info['needs_padding']:
-                        self.log(f"Content will be fitted to {fit_info['fit_width']}x{fit_info['fit_height']}")
-                        if fit_info['pad_top'] > 0 or fit_info['pad_bottom'] > 0:
-                            self.log(f"Letterbox: {fit_info['pad_top']}px top, {fit_info['pad_bottom']}px bottom")
-                        if fit_info['pad_left'] > 0 or fit_info['pad_right'] > 0:
-                            self.log(f"Pillarbox: {fit_info['pad_left']}px left, {fit_info['pad_right']}px right")
-
-                elif frame_width != target_width or frame_height != target_height:
-                    # Simple resize with sharpen (original behavior)
-                    if config.enable_smart_upscaling:
-                        scale_filter = f"-vf scale={target_width}:{target_height}:flags=spline36,unsharp=7:7:1.5:7:7:0.0"
-                        self.log(f"Advanced upscaling: {frame_width}x{frame_height} → {target_width}x{target_height}")
-                    else:
-                        scale_filter = f"-vf scale={target_width}:{target_height}:flags=lanczos,unsharp=5:5:1.0:5:5:0.0"
-                        self.log(f"Standard scaling: {frame_width}x{frame_height} → {target_width}x{target_height}")
+                # Only apply scaling if dimensions need adjustment for H.264
+                if frame_width != target_width or frame_height != target_height:
+                    scale_filter = f"-vf scale={target_width}:{target_height}:flags=lanczos,unsharp=5:5:1.0:5:5:0.0"
+                    self.log(f"Adjusting for even dimensions: {frame_width}x{frame_height} → {target_width}x{target_height}")
                     needs_scaling = True
                 else:
-                    # No resize needed, just sharpen
-                    self.log(f"Dimensions match target - adding sharpen filter only")
+                    # Dimensions are already perfect, just apply sharpening
+                    self.log(f"Frames are at target size ({frame_width}x{frame_height}) - adding sharpen filter only")
                     scale_filter = "-vf unsharp=5:5:1.0:5:5:0.0"
                     needs_scaling = True
 
