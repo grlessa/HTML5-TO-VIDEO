@@ -473,9 +473,10 @@ class HTML5ToVideoConverter:
             scale_factor_w = target_width / config.width
             scale_factor_h = target_height / config.height
             scale_factor = max(scale_factor_w, scale_factor_h)
+            zoom = min(scale_factor_w, scale_factor_h)  # zoom uses minimum for aspect ratio
             needs_scaling = scale_factor > 1.2 or scale_factor < 0.8
 
-            self.log(f"Scale factor: {scale_factor:.2f}x (w:{scale_factor_w:.2f}x, h:{scale_factor_h:.2f}x)")
+            self.log(f"Scale factor: {scale_factor:.2f}x (w:{scale_factor_w:.2f}x, h:{scale_factor_h:.2f}x, zoom:{zoom:.2f}x)")
 
             # Only inject CSS if we're significantly changing dimensions
             if needs_scaling:
@@ -543,16 +544,26 @@ class HTML5ToVideoConverter:
                     var existing = document.getElementById('format-override');
                     if (existing) existing.remove();
 
+                    // Remove any existing viewport meta
+                    var existingViewport = document.querySelector('meta[name="viewport"]');
+                    if (existingViewport) existingViewport.remove();
+
+                    // Add viewport meta tag for proper scaling
+                    var viewport = document.createElement('meta');
+                    viewport.name = 'viewport';
+                    viewport.content = 'width={config.width}, height={config.height}, initial-scale={zoom:.4f}, minimum-scale={zoom:.4f}, maximum-scale={zoom:.4f}, user-scalable=no';
+                    document.head.appendChild(viewport);
+
                     // Inject new CSS
                     var style = document.createElement('style');
                     style.id = 'format-override';
                     style.textContent = `{css_clean}`;
                     document.head.appendChild(style);
 
-                    console.log('Format CSS injected for {target_width}x{target_height}');
+                    console.log('Format CSS and viewport injected for {target_width}x{target_height}');
                 """
                 driver.execute_script(inject_css)
-                self.log(f"Format CSS injected successfully")
+                self.log(f"Format CSS and viewport meta injected successfully (scale: {zoom:.4f})")
 
                 # Wait a moment for CSS to apply
                 time.sleep(0.3)
