@@ -131,12 +131,19 @@ class FormatCSS:
 
         return f"""
         <style id="format-override">
-        html, body {{
+        html {{
             margin: 0 !important;
             padding: 0 !important;
+            width: {width}px !important;
+            height: {height}px !important;
             overflow: hidden !important;
         }}
         body {{
+            margin: 0 !important;
+            padding: 0 !important;
+            width: {source_width}px !important;
+            height: {source_height}px !important;
+            overflow: visible !important;
             zoom: {zoom} !important;
             -moz-transform: scale({zoom}) !important;
             -moz-transform-origin: 0 0 !important;
