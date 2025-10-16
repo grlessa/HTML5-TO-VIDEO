@@ -483,6 +483,19 @@ class HTML5ToVideoConverter:
 
             self.log("Animations triggered")
 
+            # Pause all CSS animations initially - we'll control them manually
+            driver.execute_script("""
+                // Pause all CSS animations so we can control timing
+                var style = document.createElement('style');
+                style.id = 'animation-control';
+                style.innerHTML = '* { animation-play-state: paused !important; }';
+                document.head.appendChild(style);
+
+                // Store animation start time for precise control
+                window.__animationStartTime = performance.now();
+            """)
+            self.log("CSS animations paused for frame-by-frame capture")
+
             # Capture frames
             self.log(f"=== FRAME CAPTURE ===")
             self.log(f"Total frames to capture: {total_frames}")
@@ -499,37 +512,35 @@ class HTML5ToVideoConverter:
                     driver.quit()
                     return None
 
-                # IMPORTANT: Let CSS animations run naturally by actually waiting
-                if frame_num > 0:
-                    # Simply wait for the frame time - let CSS animations progress naturally
-                    time.sleep(frame_time_s)
+                # Set animation time for this frame
+                elapsed_ms = frame_num * frame_time_s * 1000
 
-                    if frame_num % 30 == 0:  # Log every 30 frames
-                        elapsed_time = frame_num * frame_time_s
-                        self.log(f"Animation at {elapsed_time:.2f}s (frame {frame_num})")
+                if frame_num % 30 == 0:  # Log every 30 frames
+                    elapsed_time = frame_num * frame_time_s
+                    self.log(f"Animation at {elapsed_time:.2f}s (frame {frame_num})")
 
-                    # For JavaScript-based animations, update time reference
-                    elapsed_ms = int(frame_num * frame_time_s * 1000)
-                    driver.execute_script(f"""
-                        // Update time for JavaScript animations
-                        if (!window.__animationStartTime) {{
-                            window.__animationStartTime = Date.now();
-                        }}
+                # Control animation timing precisely
+                driver.execute_script(f"""
+                    // Set CSS animation delay to simulate time progression
+                    var elapsedMs = {elapsed_ms};
+                    var style = document.getElementById('animation-control');
+                    if (style) {{
+                        // Update animation delay to match frame time
+                        style.innerHTML = '* {{ animation-delay: -' + elapsedMs + 'ms !important; animation-play-state: paused !important; }}';
+                    }}
 
-                        // CreateJS support (for HTML5 banner ads)
-                        if (typeof createjs !== 'undefined' && createjs.Ticker) {{
-                            createjs.Ticker._tick();
-                        }}
+                    // Update time for JavaScript animations
+                    if (typeof createjs !== 'undefined' && createjs.Ticker) {{
+                        createjs.Ticker._tick();
+                    }}
 
-                        // GSAP support (update global timeline)
-                        if (typeof gsap !== 'undefined' && gsap.globalTimeline) {{
-                            // GSAP handles its own time, just trigger update
-                            gsap.ticker.tick();
-                        }}
+                    if (typeof gsap !== 'undefined' && gsap.globalTimeline) {{
+                        gsap.ticker.tick();
+                    }}
 
-                        // Force reflow for CSS animations
-                        document.body.offsetHeight;
-                    """)
+                    // Force reflow
+                    document.body.offsetHeight;
+                """)
 
                 frame_path = os.path.join(frames_dir, f"frame_{frame_num:06d}.png")
                 temp_screenshot = frame_path + ".tmp.png"
