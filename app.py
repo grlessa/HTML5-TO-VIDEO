@@ -122,36 +122,24 @@ class FormatCSS:
 
     @staticmethod
     def generate_css(width: int, height: int, source_width: int, source_height: int, bg_color: str = "#000000") -> str:
-        """Generate CSS that scales content to target size"""
+        """Generate CSS that scales content to target size using zoom"""
 
-        # Calculate scale to fit content into target dimensions
-        scale_x = width / source_width
-        scale_y = height / source_height
-        scale = min(scale_x, scale_y)  # Use minimum to preserve aspect ratio
-
-        # Calculate centering offsets if needed
-        scaled_width = source_width * scale
-        scaled_height = source_height * scale
-        offset_x = (width - scaled_width) / 2
-        offset_y = (height - scaled_height) / 2
+        # Calculate zoom factor to fit content into target dimensions
+        zoom_x = width / source_width
+        zoom_y = height / source_height
+        zoom = min(zoom_x, zoom_y)  # Use minimum to preserve aspect ratio
 
         return f"""
         <style id="format-override">
-        html {{
+        html, body {{
             margin: 0 !important;
             padding: 0 !important;
-            width: {width}px !important;
-            height: {height}px !important;
             overflow: hidden !important;
         }}
         body {{
-            margin: 0 !important;
-            padding: 0 !important;
-            width: {source_width}px !important;
-            height: {source_height}px !important;
-            transform: scale({scale}) translate({offset_x / scale}px, {offset_y / scale}px) !important;
-            transform-origin: top left !important;
-            overflow: hidden !important;
+            zoom: {zoom} !important;
+            -moz-transform: scale({zoom}) !important;
+            -moz-transform-origin: 0 0 !important;
         }}
         </style>
         """
