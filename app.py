@@ -1136,11 +1136,11 @@ def main():
                 st.info("Your HTML5 content should be packaged as a .zip file")
                 st.stop()
 
-            # Check file size (200MB limit for Streamlit Cloud)
-            max_size = 200 * 1024 * 1024  # 200MB
+            # Check file size (50MB limit)
+            max_size = 50 * 1024 * 1024  # 50MB
             if uploaded_file.size > max_size:
                 st.error(f"❌ File too large ({uploaded_file.size / 1024 / 1024:.1f} MB)")
-                st.info("Maximum file size: 200 MB for Streamlit Cloud")
+                st.info("Maximum file size: 50 MB")
                 st.stop()
 
             # Save uploaded file
