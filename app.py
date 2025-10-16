@@ -354,9 +354,11 @@ class HTML5ToVideoConverter:
         chrome_options.add_argument('--force-device-scale-factor=1')
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
         # Add extra height for browser chrome in headless mode
-        window_size = f'{target_width},{target_height + 100}'
+        # Need more buffer for smaller heights (chrome UI takes proportionally more space)
+        height_buffer = max(150, int(target_height * 0.3))  # At least 150px or 30% of height
+        window_size = f'{target_width},{target_height + height_buffer}'
         chrome_options.add_argument(f'--window-size={window_size}')
-        self.log(f"Chrome --window-size: {window_size}")
+        self.log(f"Chrome --window-size: {window_size} (target: {target_width}x{target_height}, buffer: {height_buffer}px)")
 
         # Find browser binary
         browser_paths = [
@@ -395,8 +397,8 @@ class HTML5ToVideoConverter:
         try:
             # REQUIREMENT #2: Set window size via Selenium (in addition to chrome_options)
             self.log(f"=== PAGE LOADING ===")
-            driver.set_window_size(target_width, target_height + 100)
-            self.log(f"Selenium set_window_size called: {target_width}x{target_height + 100}")
+            driver.set_window_size(target_width, target_height + height_buffer)
+            self.log(f"Selenium set_window_size called: {target_width}x{target_height + height_buffer}")
 
             # Load HTML
             file_url = f"file://{html_path}"
