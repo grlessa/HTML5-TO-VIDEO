@@ -148,10 +148,14 @@ class FormatCSS:
             background: {bg_color} !important;
         }}
         #__scale_wrapper__ {{
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
             width: {source_width}px !important;
             height: {source_height}px !important;
             transform: scale({scale}) translate({offset_x/scale}px, {offset_y/scale}px) !important;
             transform-origin: top left !important;
+            overflow: visible !important;
         }}
         </style>
         """
