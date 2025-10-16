@@ -483,18 +483,35 @@ class HTML5ToVideoConverter:
 
             self.log("Animations triggered")
 
-            # Pause all CSS animations initially - we'll control them manually
+            # Let animations run briefly to establish initial random states
+            time.sleep(0.1)
+            self.log("Allowed 0.1s for animations to initialize")
+
+            # Now pause and take control using Web Animations API for better control
             driver.execute_script("""
-                // Pause all CSS animations so we can control timing
-                var style = document.createElement('style');
-                style.id = 'animation-control';
-                style.innerHTML = '* { animation-play-state: paused !important; }';
-                document.head.appendChild(style);
+                // Store all CSS animations using Web Animations API
+                window.__animationElements = [];
+
+                document.querySelectorAll('*').forEach(function(el) {
+                    var animations = el.getAnimations();
+                    if (animations.length > 0) {
+                        animations.forEach(function(anim) {
+                            // Pause the animation at its current state
+                            anim.pause();
+                            window.__animationElements.push(anim);
+                        });
+                    }
+                });
+
+                console.log('Paused ' + window.__animationElements.length + ' animations');
 
                 // Store animation start time for precise control
                 window.__animationStartTime = performance.now();
             """)
-            self.log("CSS animations paused for frame-by-frame capture")
+
+            # Check how many animations were paused
+            num_paused = driver.execute_script("return window.__animationElements ? window.__animationElements.length : 0;")
+            self.log(f"Paused {num_paused} CSS animations for frame-by-frame control")
 
             # Capture frames
             self.log(f"=== FRAME CAPTURE ===")
@@ -519,14 +536,15 @@ class HTML5ToVideoConverter:
                     elapsed_time = frame_num * frame_time_s
                     self.log(f"Animation at {elapsed_time:.2f}s (frame {frame_num})")
 
-                # Control animation timing precisely
+                # Control animation timing precisely using Web Animations API
                 driver.execute_script(f"""
-                    // Set CSS animation delay to simulate time progression
                     var elapsedMs = {elapsed_ms};
-                    var style = document.getElementById('animation-control');
-                    if (style) {{
-                        // Update animation delay to match frame time
-                        style.innerHTML = '* {{ animation-delay: -' + elapsedMs + 'ms !important; animation-play-state: paused !important; }}';
+
+                    // Update all paused CSS animations to exact time
+                    if (window.__animationElements) {{
+                        window.__animationElements.forEach(function(anim) {{
+                            anim.currentTime = elapsedMs;
+                        }});
                     }}
 
                     // Update time for JavaScript animations
