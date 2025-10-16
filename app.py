@@ -149,6 +149,7 @@ class FormatCSS:
             width: {width}px !important;
             height: {height}px !important;
         }}
+        /* Optional responsive enhancements for ads with data-role attributes */
         [data-role=headline] {{
             font-size: {headline_size} !important;
             line-height: 1.1 !important;
@@ -493,85 +494,96 @@ class HTML5ToVideoConverter:
             driver.get(file_url)
             self.log(f"Page loaded")
 
-            # Always inject format-specific CSS for social media
-            self.log(f"=== INJECTING FORMAT CSS ===")
-            self.log(f"Target format: {format_name}")
+            # Calculate if we need significant scaling
+            scale_factor_w = target_width / config.width
+            scale_factor_h = target_height / config.height
+            scale_factor = max(scale_factor_w, scale_factor_h)
+            needs_scaling = scale_factor > 1.2 or scale_factor < 0.8
 
-            # Extract predominant background color from page
-            try:
-                bg_color_js = """
-                    function getPredominantColor() {
-                        // Try body background color first
-                        let bodyBg = window.getComputedStyle(document.body).backgroundColor;
-                        if (bodyBg && bodyBg !== 'rgba(0, 0, 0, 0)' && bodyBg !== 'transparent') {
-                            return bodyBg;
-                        }
+            self.log(f"Scale factor: {scale_factor:.2f}x (w:{scale_factor_w:.2f}x, h:{scale_factor_h:.2f}x)")
 
-                        // Try html background color
-                        let htmlBg = window.getComputedStyle(document.documentElement).backgroundColor;
-                        if (htmlBg && htmlBg !== 'rgba(0, 0, 0, 0)' && htmlBg !== 'transparent') {
-                            return htmlBg;
-                        }
+            # Only inject CSS if we're significantly changing dimensions
+            if needs_scaling:
+                self.log(f"=== INJECTING FORMAT CSS ===")
+                self.log(f"Target format: {format_name}")
 
-                        // Try first div or main content container
-                        let containers = document.querySelectorAll('div, main, section, #banner, .frame');
-                        for (let el of containers) {
-                            let bg = window.getComputedStyle(el).backgroundColor;
-                            if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
-                                return bg;
+                # Extract predominant background color from page
+                try:
+                    bg_color_js = """
+                        function getPredominantColor() {
+                            // Try body background color first
+                            let bodyBg = window.getComputedStyle(document.body).backgroundColor;
+                            if (bodyBg && bodyBg !== 'rgba(0, 0, 0, 0)' && bodyBg !== 'transparent') {
+                                return bodyBg;
                             }
+
+                            // Try html background color
+                            let htmlBg = window.getComputedStyle(document.documentElement).backgroundColor;
+                            if (htmlBg && htmlBg !== 'rgba(0, 0, 0, 0)' && htmlBg !== 'transparent') {
+                                return htmlBg;
+                            }
+
+                            // Try first div or main content container
+                            let containers = document.querySelectorAll('div, main, section, #banner, .frame');
+                            for (let el of containers) {
+                                let bg = window.getComputedStyle(el).backgroundColor;
+                                if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+                                    return bg;
+                                }
+                            }
+
+                            // Default to black
+                            return 'rgb(0, 0, 0)';
                         }
+                        return getPredominantColor();
+                    """
+                    bg_color_rgb = driver.execute_script(bg_color_js)
 
-                        // Default to black
-                        return 'rgb(0, 0, 0)';
-                    }
-                    return getPredominantColor();
-                """
-                bg_color_rgb = driver.execute_script(bg_color_js)
-
-                # Convert RGB to hex
-                if bg_color_rgb and bg_color_rgb.startswith('rgb'):
-                    import re
-                    rgb_match = re.search(r'(\d+),\s*(\d+),\s*(\d+)', bg_color_rgb)
-                    if rgb_match:
-                        r, g, b = map(int, rgb_match.groups())
-                        bg_color_hex = f"#{r:02x}{g:02x}{b:02x}"
+                    # Convert RGB to hex
+                    if bg_color_rgb and bg_color_rgb.startswith('rgb'):
+                        import re
+                        rgb_match = re.search(r'(\d+),\s*(\d+),\s*(\d+)', bg_color_rgb)
+                        if rgb_match:
+                            r, g, b = map(int, rgb_match.groups())
+                            bg_color_hex = f"#{r:02x}{g:02x}{b:02x}"
+                        else:
+                            bg_color_hex = "#000000"
                     else:
-                        bg_color_hex = "#000000"
-                else:
-                    bg_color_hex = bg_color_rgb if bg_color_rgb else "#000000"
+                        bg_color_hex = bg_color_rgb if bg_color_rgb else "#000000"
 
-                self.log(f"Detected background color: {bg_color_rgb} → {bg_color_hex}")
-            except Exception as e:
-                self.log(f"Could not detect background color, using black: {e}")
-                bg_color_hex = "#000000"
+                    self.log(f"Detected background color: {bg_color_rgb} → {bg_color_hex}")
+                except Exception as e:
+                    self.log(f"Could not detect background color, using black: {e}")
+                    bg_color_hex = "#000000"
 
-            # Generate CSS with detected background color
-            css_code = FormatCSS.generate_css(target_width, target_height, bg_color_hex)
+                # Generate CSS with detected background color
+                css_code = FormatCSS.generate_css(target_width, target_height, bg_color_hex)
 
-            # Inject CSS into the page
-            # Clean CSS code for injection (escape backticks)
-            css_clean = css_code.replace('`', '\\`').replace('\n', ' ')
+                # Inject CSS into the page
+                # Clean CSS code for injection (escape backticks)
+                css_clean = css_code.replace('`', '\\`').replace('\n', ' ')
 
-            inject_css = f"""
-                // Remove any existing format override
-                var existing = document.getElementById('format-override');
-                if (existing) existing.remove();
+                inject_css = f"""
+                    // Remove any existing format override
+                    var existing = document.getElementById('format-override');
+                    if (existing) existing.remove();
 
-                // Inject new CSS
-                var style = document.createElement('style');
-                style.id = 'format-override';
-                style.textContent = `{css_clean}`;
-                document.head.appendChild(style);
+                    // Inject new CSS
+                    var style = document.createElement('style');
+                    style.id = 'format-override';
+                    style.textContent = `{css_clean}`;
+                    document.head.appendChild(style);
 
-                console.log('Format CSS injected for {target_width}x{target_height}');
-            """
-            driver.execute_script(inject_css)
-            self.log(f"Format CSS injected successfully")
+                    console.log('Format CSS injected for {target_width}x{target_height}');
+                """
+                driver.execute_script(inject_css)
+                self.log(f"Format CSS injected successfully")
 
-            # Wait a moment for CSS to apply
-            time.sleep(0.3)
-            self.log("Waited for CSS to apply")
+                # Wait a moment for CSS to apply
+                time.sleep(0.3)
+                self.log("Waited for CSS to apply")
+            else:
+                self.log(f"Skipping CSS injection - scale factor {scale_factor:.2f}x is within acceptable range (0.8x - 1.2x)")
 
             # REQUIREMENT #3: Force document and body to EXACT dimensions via JavaScript
             self.log(f"=== APPLYING JAVASCRIPT RESIZE ===")
