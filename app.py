@@ -121,56 +121,37 @@ class FormatCSS:
     """CSS templates for social media formats"""
 
     @staticmethod
-    def generate_css(width: int, height: int, bg_color: str = "#000000") -> str:
-        """Generate format-specific CSS with custom background color"""
+    def generate_css(width: int, height: int, source_width: int, source_height: int, bg_color: str = "#000000") -> str:
+        """Generate CSS that scales content to target size"""
 
-        # Determine responsive settings based on format
-        if width == height:  # Square
-            headline_size = "clamp(24px, 3.4vw, 44px)"
-            cta_bottom = "9%"
-            logo_width = "18%"
-        else:  # Vertical
-            headline_size = "clamp(26px, 3.0vw, 52px)"
-            cta_bottom = "8%"
-            logo_width = "22%"
+        # Calculate scale to fit content into target dimensions
+        scale_x = width / source_width
+        scale_y = height / source_height
+        scale = min(scale_x, scale_y)  # Use minimum to preserve aspect ratio
+
+        # Calculate centering offsets if needed
+        scaled_width = source_width * scale
+        scaled_height = source_height * scale
+        offset_x = (width - scaled_width) / 2
+        offset_y = (height - scaled_height) / 2
 
         return f"""
         <style id="format-override">
-        :root {{ --safe: 6%; }}
-        html, body {{
+        html {{
             margin: 0 !important;
             padding: 0 !important;
             width: {width}px !important;
             height: {height}px !important;
             overflow: hidden !important;
         }}
-        #banner, .frame {{
-            width: {width}px !important;
-            height: {height}px !important;
-        }}
-        /* Optional responsive enhancements for ads with data-role attributes */
-        [data-role=headline] {{
-            font-size: {headline_size} !important;
-            line-height: 1.1 !important;
-        }}
-        [data-role=cta] {{
-            position: absolute !important;
-            left: 8% !important;
-            right: 8% !important;
-            bottom: {cta_bottom} !important;
-            min-height: 56px !important;
-        }}
-        [data-role=footers] {{
-            position: absolute !important;
-            left: 6% !important;
-            right: 6% !important;
-            top: 6% !important;
-        }}
-        [data-role=logo] {{
-            position: absolute !important;
-            right: 6% !important;
-            bottom: 6% !important;
-            max-width: {logo_width} !important;
+        body {{
+            margin: 0 !important;
+            padding: 0 !important;
+            width: {source_width}px !important;
+            height: {source_height}px !important;
+            transform: scale({scale}) translate({offset_x / scale}px, {offset_y / scale}px) !important;
+            transform-origin: top left !important;
+            overflow: hidden !important;
         }}
         </style>
         """
@@ -556,7 +537,7 @@ class HTML5ToVideoConverter:
                     bg_color_hex = "#000000"
 
                 # Generate CSS with detected background color
-                css_code = FormatCSS.generate_css(target_width, target_height, bg_color_hex)
+                css_code = FormatCSS.generate_css(target_width, target_height, config.width, config.height, bg_color_hex)
 
                 # Inject CSS into the page
                 # Clean CSS code for injection (escape backticks)
