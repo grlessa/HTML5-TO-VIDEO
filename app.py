@@ -119,6 +119,92 @@ class HTML5Analyzer:
         }
 
 
+class FormatCSS:
+    """CSS templates for social media formats"""
+
+    CSS_1080x1080 = """
+    <style id="format-override">
+    :root { --safe: 6%; }
+    html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #000 !important;
+        width: 1080px !important;
+        height: 1080px !important;
+        overflow: hidden !important;
+    }
+    #banner, .frame {
+        width: 1080px !important;
+        height: 1080px !important;
+    }
+    [data-role=headline] {
+        font-size: clamp(24px, 3.4vw, 44px) !important;
+        line-height: 1.1 !important;
+    }
+    [data-role=cta] {
+        position: absolute !important;
+        left: 8% !important;
+        right: 8% !important;
+        bottom: 9% !important;
+        min-height: 56px !important;
+    }
+    [data-role=footers] {
+        position: absolute !important;
+        left: 6% !important;
+        right: 6% !important;
+        top: 6% !important;
+    }
+    [data-role=logo] {
+        position: absolute !important;
+        right: 6% !important;
+        bottom: 6% !important;
+        max-width: 18% !important;
+    }
+    </style>
+    """
+
+    CSS_1080x1920 = """
+    <style id="format-override">
+    :root { --safe: 6%; }
+    html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #000 !important;
+        width: 1080px !important;
+        height: 1920px !important;
+        overflow: hidden !important;
+    }
+    #banner, .frame {
+        width: 1080px !important;
+        height: 1920px !important;
+    }
+    [data-role=headline] {
+        font-size: clamp(26px, 3.0vw, 52px) !important;
+        line-height: 1.1 !important;
+    }
+    [data-role=cta] {
+        position: absolute !important;
+        left: 8% !important;
+        right: 8% !important;
+        bottom: 8% !important;
+        min-height: 60px !important;
+    }
+    [data-role=footers] {
+        position: absolute !important;
+        left: 6% !important;
+        right: 6% !important;
+        top: 6% !important;
+    }
+    [data-role=logo] {
+        position: absolute !important;
+        right: 6% !important;
+        bottom: 6% !important;
+        max-width: 22% !important;
+    }
+    </style>
+    """
+
+
 class SmartUpscaler:
     """Handles smart aspect ratio fitting and upscaling"""
 
@@ -334,12 +420,26 @@ class HTML5ToVideoConverter:
         total_frames = config.fps * config.duration
         frame_time_s = 1.0 / config.fps
 
-        # Target dimensions (ensure even for H.264)
-        target_width = config.width if config.width % 2 == 0 else config.width + 1
-        target_height = config.height if config.height % 2 == 0 else config.height + 1
+        # Target dimensions - override if using format CSS injection
+        if config.target_format == "1080x1080":
+            target_width = 1080
+            target_height = 1080
+            use_css_injection = True
+        elif config.target_format == "1080x1920":
+            target_width = 1080
+            target_height = 1920
+            use_css_injection = True
+        else:
+            # Use original dimensions (ensure even for H.264)
+            target_width = config.width if config.width % 2 == 0 else config.width + 1
+            target_height = config.height if config.height % 2 == 0 else config.height + 1
+            use_css_injection = False
 
         self.log(f"=== HTML5 TO VIDEO RENDERING ===")
-        self.log(f"Target dimensions: {target_width}x{target_height} (even-adjusted from {config.width}x{config.height})")
+        if use_css_injection:
+            self.log(f"Target dimensions: {target_width}x{target_height} (CSS injection mode for {config.target_format})")
+        else:
+            self.log(f"Target dimensions: {target_width}x{target_height} (even-adjusted from {config.width}x{config.height})")
         self.log(f"Total frames: {total_frames} ({config.fps} FPS × {config.duration}s)")
         self.log(f"Frame time: {frame_time_s:.4f}s per frame")
 
@@ -405,6 +505,41 @@ class HTML5ToVideoConverter:
             self.log(f"Loading URL: {file_url}")
             driver.get(file_url)
             self.log(f"Page loaded")
+
+            # Inject format-specific CSS if target format is set
+            if config.target_format in ["1080x1080", "1080x1920"]:
+                self.log(f"=== INJECTING FORMAT CSS ===")
+                self.log(f"Target format: {config.target_format}")
+
+                # Get appropriate CSS
+                if config.target_format == "1080x1080":
+                    css_code = FormatCSS.CSS_1080x1080
+                else:
+                    css_code = FormatCSS.CSS_1080x1920
+
+                # Inject CSS into the page
+                # Clean CSS code for injection (escape backticks)
+                css_clean = css_code.replace('`', '\\`').replace('\n', ' ')
+
+                inject_css = f"""
+                    // Remove any existing format override
+                    var existing = document.getElementById('format-override');
+                    if (existing) existing.remove();
+
+                    // Inject new CSS
+                    var style = document.createElement('style');
+                    style.id = 'format-override';
+                    style.textContent = `{css_clean}`;
+                    document.head.appendChild(style);
+
+                    console.log('Format CSS injected for {config.target_format}');
+                """
+                driver.execute_script(inject_css)
+                self.log(f"Format CSS injected successfully")
+
+                # Wait a moment for CSS to apply
+                time.sleep(0.3)
+                self.log("Waited for CSS to apply")
 
             # REQUIREMENT #3: Force document and body to EXACT dimensions via JavaScript
             self.log(f"=== APPLYING JAVASCRIPT RESIZE ===")
