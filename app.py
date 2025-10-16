@@ -91,7 +91,10 @@ class HTML5Analyzer:
             if matches:
                 durations = [int(m) for m in matches if int(m) < 1000]
                 if durations:
-                    duration = max(durations)
+                    detected_duration = max(durations)
+                    # Cap at 30 seconds max (most HTML5 ads are under 30s)
+                    # This prevents false positives from picking up large timeouts
+                    duration = min(detected_duration, 30)
                     break
 
         # Detect if high FPS needed (check for animation-heavy content)
