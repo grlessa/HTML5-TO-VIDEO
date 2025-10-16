@@ -1510,6 +1510,11 @@ def main():
                         col3.metric("Duration", f"{duration}s")
                         col4.metric("Quality", "High")
 
+                        # Detect and show output format
+                        from app import FormatCSS
+                        output_width, output_height, format_name = FormatCSS.detect_best_format(width, height)
+                        st.info(f"📐 **Output Format:** {format_name} - Your content will be automatically fitted to {output_width}x{output_height} with aspect ratio preserved")
+
                         # Use optimal settings for high quality (compatible with st.video)
                         codec = "libx264"
                         preset = "slow"
