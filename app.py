@@ -136,11 +136,10 @@ class FormatCSS:
 
         return f"""
         <style id="format-override">
-        :root {{ --safe: 6%; --bg-color: {bg_color}; }}
+        :root {{ --safe: 6%; }}
         html, body {{
             margin: 0 !important;
             padding: 0 !important;
-            background: var(--bg-color) !important;
             width: {width}px !important;
             height: {height}px !important;
             overflow: hidden !important;
