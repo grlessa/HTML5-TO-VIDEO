@@ -550,36 +550,38 @@ class HTML5ToVideoConverter:
                 # Wait a moment for CSS to apply
                 time.sleep(0.3)
                 self.log("Waited for CSS to apply")
+                self.log("Skipping JavaScript resize - CSS zoom handles scaling")
             else:
                 self.log(f"Skipping CSS injection - scale factor {scale_factor:.2f}x is within acceptable range (0.8x - 1.2x)")
 
-            # REQUIREMENT #3: Force document and body to EXACT dimensions via JavaScript
-            self.log(f"=== APPLYING JAVASCRIPT RESIZE ===")
-            js_resize = f"""
-                document.documentElement.style.margin = '0';
-                document.documentElement.style.padding = '0';
-                document.documentElement.style.overflow = 'hidden';
-                document.documentElement.style.width = '{target_width}px';
-                document.documentElement.style.height = '{target_height}px';
+                # REQUIREMENT #3: Force document and body to EXACT dimensions via JavaScript
+                # Only do this when NOT using CSS zoom
+                self.log(f"=== APPLYING JAVASCRIPT RESIZE ===")
+                js_resize = f"""
+                    document.documentElement.style.margin = '0';
+                    document.documentElement.style.padding = '0';
+                    document.documentElement.style.overflow = 'hidden';
+                    document.documentElement.style.width = '{target_width}px';
+                    document.documentElement.style.height = '{target_height}px';
 
-                document.body.style.margin = '0';
-                document.body.style.padding = '0';
-                document.body.style.overflow = 'hidden';
-                document.body.style.width = '{target_width}px';
-                document.body.style.height = '{target_height}px';
-                document.body.style.minWidth = '{target_width}px';
-                document.body.style.minHeight = '{target_height}px';
-                document.body.style.maxWidth = '{target_width}px';
-                document.body.style.maxHeight = '{target_height}px';
+                    document.body.style.margin = '0';
+                    document.body.style.padding = '0';
+                    document.body.style.overflow = 'hidden';
+                    document.body.style.width = '{target_width}px';
+                    document.body.style.height = '{target_height}px';
+                    document.body.style.minWidth = '{target_width}px';
+                    document.body.style.minHeight = '{target_height}px';
+                    document.body.style.maxWidth = '{target_width}px';
+                    document.body.style.maxHeight = '{target_height}px';
 
-                var canvases = document.getElementsByTagName('canvas');
-                for (var i = 0; i < canvases.length; i++) {{
-                    canvases[i].style.width = '{target_width}px';
-                    canvases[i].style.height = '{target_height}px';
-                }}
-            """
-            driver.execute_script(js_resize)
-            self.log("JavaScript resize script executed")
+                    var canvases = document.getElementsByTagName('canvas');
+                    for (var i = 0; i < canvases.length; i++) {{
+                        canvases[i].style.width = '{target_width}px';
+                        canvases[i].style.height = '{target_height}px';
+                    }}
+                """
+                driver.execute_script(js_resize)
+                self.log("JavaScript resize script executed")
 
             # REQUIREMENT #4: Delay for page to settle
             self.log("Waiting 1.5s for page to settle...")
