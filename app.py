@@ -17,7 +17,6 @@ import re
 from typing import Optional, Tuple
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-import base64
 
 
 @dataclass
@@ -578,7 +577,7 @@ class HTML5ToVideoConverter:
             try:
                 driver.quit()
                 self.log("Browser closed after error")
-            except:
+            except Exception:
                 self.log("Failed to close browser")
             return None
 
@@ -868,14 +867,6 @@ class HTML5ToVideoConverter:
                 self.log(f"Cleanup error: {cleanup_error}")
 
 
-def get_download_link(file_path: str, filename: str) -> str:
-    """Generate download link for file"""
-    with open(file_path, 'rb') as f:
-        data = f.read()
-    b64 = base64.b64encode(data).decode()
-    return f'<a href="data:application/octet-stream;base64,{b64}" download="{filename}" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin-top: 20px;">📥 Download Video</a>'
-
-
 def main():
     # Page config
     st.set_page_config(
@@ -1069,6 +1060,19 @@ def main():
     # Continue with left column for conversion process
     with left_col:
         if uploaded_file:
+            # Validate file
+            if not uploaded_file.name.lower().endswith('.zip'):
+                st.error("❌ Please upload a ZIP file")
+                st.info("Your HTML5 content should be packaged as a .zip file")
+                st.stop()
+
+            # Check file size (200MB limit for Streamlit Cloud)
+            max_size = 200 * 1024 * 1024  # 200MB
+            if uploaded_file.size > max_size:
+                st.error(f"❌ File too large ({uploaded_file.size / 1024 / 1024:.1f} MB)")
+                st.info("Maximum file size: 200 MB for Streamlit Cloud")
+                st.stop()
+
             # Save uploaded file
             temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
             temp_zip.write(uploaded_file.read())
@@ -1145,13 +1149,27 @@ def main():
                     if message:
                         status_text.text(message)
 
-                # Run conversion
+                # Run conversion with error handling
                 converter = HTML5ToVideoConverter(progress_callback=update_progress)
-                success = converter.convert(temp_zip.name, output_file.name, config)
+                try:
+                    success = converter.convert(temp_zip.name, output_file.name, config)
+                except FileNotFoundError as e:
+                    if "chrome" in str(e).lower() or "chromium" in str(e).lower():
+                        st.error("❌ Browser not found. Please install Chrome or Chromium.")
+                    elif "ffmpeg" in str(e).lower():
+                        st.error("❌ FFmpeg not found. Please install FFmpeg.")
+                    else:
+                        st.error(f"❌ File not found: {e}")
+                    st.info("💡 Check 'Debug Details' below for more information")
+                    success = False
+                except Exception as e:
+                    st.error(f"❌ Conversion failed: {str(e)}")
+                    st.info("💡 Check 'Debug Details' below for more information")
+                    success = False
 
                 # Complete
                 progress_bar.progress(1.0)
-                status_text.success("Complete")
+                status_text.success("Complete") if success else status_text.empty()
 
                 # Show terminal-style debug output (complete log)
                 with st.expander("Debug Details", expanded=False):
@@ -1176,10 +1194,16 @@ def main():
                         use_container_width=True
                     )
 
+                    # Cleanup output file (video already in memory as video_bytes)
+                    try:
+                        os.unlink(output_file.name)
+                    except Exception:
+                        pass
+
             # Cleanup zip
             try:
                 os.unlink(temp_zip.name)
-            except:
+            except Exception:
                 pass
 
 
