@@ -156,7 +156,38 @@ class HTML5ToVideoConverter:
 
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             files = zip_ref.namelist()
+
+            # Validate empty ZIP
+            if len(files) == 0:
+                self.log("ERROR: ZIP file is empty")
+                raise ValueError("ZIP file is empty")
+
+            # Validate file count (prevent excessive files)
+            if len(files) > 1000:
+                self.log(f"ERROR: ZIP contains too many files ({len(files)})")
+                raise ValueError(f"ZIP contains too many files ({len(files)}). Maximum 1000 files allowed.")
+
+            # Calculate total uncompressed size (prevent ZIP bombs)
+            total_size = sum(info.file_size for info in zip_ref.infolist())
+            max_uncompressed = 50 * 1024 * 1024  # 50MB uncompressed
+
+            if total_size > max_uncompressed:
+                size_mb = total_size / (1024 * 1024)
+                self.log(f"ERROR: Uncompressed size too large ({size_mb:.1f} MB)")
+                raise ValueError(f"Uncompressed size too large ({size_mb:.1f} MB). Maximum 50 MB allowed.")
+
             self.log(f"ZIP contains {len(files)} files")
+            self.log(f"Total uncompressed size: {total_size / (1024 * 1024):.1f} MB")
+
+            # Validate all paths for security (prevent path traversal)
+            for file in files:
+                # Normalize path and check for traversal attempts
+                normalized = os.path.normpath(file)
+                if normalized.startswith('..') or os.path.isabs(normalized):
+                    self.log(f"ERROR: Unsafe file path detected: {file}")
+                    raise ValueError(f"Unsafe file path in ZIP: {file}")
+
+            # Safe to extract now
             zip_ref.extractall(extract_dir)
             self.log(f"Extracted all files successfully")
 
@@ -243,7 +274,13 @@ class HTML5ToVideoConverter:
             self.log("Creating WebDriver instance...")
             driver = webdriver.Chrome(options=chrome_options)
             self.log("WebDriver created successfully")
+
+            # Set timeouts to prevent hanging
+            driver.set_page_load_timeout(30)  # 30 second page load timeout
+            driver.set_script_timeout(10)     # 10 second script execution timeout
+            self.log("Timeouts set: 30s page load, 10s script execution")
         except Exception as e:
+            self.log(f"ERROR: Failed to create WebDriver: {e}")
             return None
 
         try:
@@ -713,6 +750,20 @@ class HTML5ToVideoConverter:
             self.log(f"FFmpeg process started (PID: {process.pid})")
             self.log("Waiting for FFmpeg to complete...")
 
+            # Poll process and check for cancellation
+            while process.poll() is None:
+                if self.cancelled:
+                    self.log("Cancellation detected, terminating FFmpeg process...")
+                    process.terminate()
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        self.log("FFmpeg did not terminate, forcing kill...")
+                        process.kill()
+                    self.log("FFmpeg process terminated by user cancellation")
+                    return False
+                time.sleep(0.1)
+
             # Capture output
             stdout, stderr = process.communicate()
 
@@ -1050,11 +1101,22 @@ def main():
         if mode == "Manual":
             col1, col2 = st.columns(2)
             with col1:
-                width = st.number_input("Width", 100, 7680, 1920)
-                fps = st.number_input("FPS", 1, 120, 60)
+                width = st.number_input("Width", 100, 3840, 1920)  # Cap at 4K
+                fps = st.number_input("FPS", 1, 60, 60)  # Cap at 60fps
             with col2:
-                height = st.number_input("Height", 100, 4320, 1080)
-                duration = st.number_input("Duration", 1, 3600, 10)
+                height = st.number_input("Height", 100, 2160, 1080)  # Cap at 4K
+                duration = st.number_input("Duration", 1, 300, 10)  # Cap at 5 minutes
+
+            # Validate total computational load
+            total_frames = fps * duration
+            total_pixels = width * height * total_frames
+
+            # Max: 4K @ 60fps for 60 seconds = 497,664,000 pixels
+            max_pixels = 3840 * 2160 * 60 * 60
+            if total_pixels > max_pixels:
+                st.error("❌ Configuration too demanding")
+                st.info(f"Total processing load: {total_pixels:,} pixel-frames. Maximum: {max_pixels:,}. Try reducing resolution, FPS, or duration.")
+                st.stop()
 
     # Right column: Preview area (placeholder initially)
     with right_col:
@@ -1157,7 +1219,7 @@ def main():
                     if message:
                         status_text.text(message)
 
-                # Run conversion with error handling
+                # Run conversion with error handling and cleanup
                 converter = HTML5ToVideoConverter(progress_callback=update_progress)
                 try:
                     success = converter.convert(temp_zip.name, output_file.name, config)
@@ -1174,6 +1236,13 @@ def main():
                     st.error(f"❌ Conversion failed: {str(e)}")
                     st.info("💡 Check 'Debug Details' below for more information")
                     success = False
+                finally:
+                    # Always cleanup temp ZIP file
+                    try:
+                        if os.path.exists(temp_zip.name):
+                            os.unlink(temp_zip.name)
+                    except Exception:
+                        pass
 
                 # Complete
                 progress_bar.progress(1.0)
@@ -1181,6 +1250,12 @@ def main():
                     status_text.success("Complete")
                 else:
                     status_text.empty()
+                    # Cleanup output file on failure
+                    try:
+                        if os.path.exists(output_file.name):
+                            os.unlink(output_file.name)
+                    except Exception:
+                        pass
 
                 # Show terminal-style debug output (complete log)
                 with st.expander("Debug Details", expanded=False):
@@ -1210,12 +1285,6 @@ def main():
                         os.unlink(output_file.name)
                     except Exception:
                         pass
-
-            # Cleanup zip
-            try:
-                os.unlink(temp_zip.name)
-            except Exception:
-                pass
 
 
 
