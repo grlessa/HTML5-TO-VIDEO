@@ -122,31 +122,36 @@ class FormatCSS:
 
     @staticmethod
     def generate_css(width: int, height: int, source_width: int, source_height: int, bg_color: str = "#000000") -> str:
-        """Generate CSS that scales content to target size using zoom"""
+        """Generate CSS for wrapping and scaling content"""
 
-        # Calculate zoom factor to fit content into target dimensions
-        zoom_x = width / source_width
-        zoom_y = height / source_height
-        zoom = min(zoom_x, zoom_y)  # Use minimum to preserve aspect ratio
+        # Calculate scale to fit
+        scale_x = width / source_width
+        scale_y = height / source_height
+        scale = min(scale_x, scale_y)  # preserve aspect ratio
+
+        # Calculate final scaled size
+        scaled_w = source_width * scale
+        scaled_h = source_height * scale
+
+        # Calculate offsets to center
+        offset_x = (width - scaled_w) / 2
+        offset_y = (height - scaled_h) / 2
 
         return f"""
         <style id="format-override">
-        html {{
+        html, body {{
             margin: 0 !important;
             padding: 0 !important;
             width: {width}px !important;
             height: {height}px !important;
             overflow: hidden !important;
+            background: {bg_color} !important;
         }}
-        body {{
-            margin: 0 !important;
-            padding: 0 !important;
+        #__scale_wrapper__ {{
             width: {source_width}px !important;
             height: {source_height}px !important;
-            overflow: visible !important;
-            zoom: {zoom} !important;
-            -moz-transform: scale({zoom}) !important;
-            -moz-transform-origin: 0 0 !important;
+            transform: scale({scale}) translate({offset_x/scale}px, {offset_y/scale}px) !important;
+            transform-origin: top left !important;
         }}
         </style>
         """
@@ -543,16 +548,16 @@ class HTML5ToVideoConverter:
                     // Remove any existing format override
                     var existing = document.getElementById('format-override');
                     if (existing) existing.remove();
+                    var existingWrapper = document.getElementById('__scale_wrapper__');
+                    if (existingWrapper) existingWrapper.remove();
 
-                    // Remove any existing viewport meta
-                    var existingViewport = document.querySelector('meta[name="viewport"]');
-                    if (existingViewport) existingViewport.remove();
-
-                    // Add viewport meta tag for proper scaling
-                    var viewport = document.createElement('meta');
-                    viewport.name = 'viewport';
-                    viewport.content = 'width={config.width}, height={config.height}, initial-scale={zoom:.4f}, minimum-scale={zoom:.4f}, maximum-scale={zoom:.4f}, user-scalable=no';
-                    document.head.appendChild(viewport);
+                    // Wrap all body content in a scaling div
+                    var wrapper = document.createElement('div');
+                    wrapper.id = '__scale_wrapper__';
+                    while (document.body.firstChild) {{
+                        wrapper.appendChild(document.body.firstChild);
+                    }}
+                    document.body.appendChild(wrapper);
 
                     // Inject new CSS
                     var style = document.createElement('style');
@@ -560,10 +565,10 @@ class HTML5ToVideoConverter:
                     style.textContent = `{css_clean}`;
                     document.head.appendChild(style);
 
-                    console.log('Format CSS and viewport injected for {target_width}x{target_height}');
+                    console.log('Content wrapped and CSS injected for scaling');
                 """
                 driver.execute_script(inject_css)
-                self.log(f"Format CSS and viewport meta injected successfully (scale: {zoom:.4f})")
+                self.log(f"Content wrapped in scaling div with transform")
 
                 # Wait a moment for CSS to apply
                 time.sleep(0.3)
