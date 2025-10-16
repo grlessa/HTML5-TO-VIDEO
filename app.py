@@ -997,8 +997,8 @@ def main():
         }
 
         .stVideo video {
-            max-height: 150px !important;
-            height: 150px !important;
+            max-height: 250px !important;
+            height: auto !important;
             max-width: 100% !important;
             width: auto !important;
             object-fit: contain !important;
@@ -1009,7 +1009,7 @@ def main():
 
         /* Also target the video element directly */
         video {
-            max-height: 150px !important;
+            max-height: 250px !important;
         }
 
         /* Make expander more discrete */
