@@ -633,19 +633,21 @@ class HTML5ToVideoConverter:
 
                 if needs_scaling:
                     self.log(f"Odd dimensions detected - will scale: {frame_width}x{frame_height} → {adjusted_width}x{adjusted_height}")
-                    scale_filter = f"-vf scale={adjusted_width}:{adjusted_height}:flags=lanczos"
-                    self.log(f"Scale filter: {scale_filter}")
+                    scale_filter = f"-vf scale={adjusted_width}:{adjusted_height}:flags=lanczos,unsharp=5:5:1.0:5:5:0.0"
+                    self.log(f"Scale filter with sharpen: {scale_filter}")
                 else:
-                    self.log(f"Dimensions are even - no scaling needed")
+                    self.log(f"Dimensions are even - adding sharpen filter only")
+                    scale_filter = "-vf unsharp=5:5:1.0:5:5:0.0"
+                    needs_scaling = True  # Flag to add filter
 
         except Exception as e:
             self.log(f"ERROR: Could not read frame: {e}")
             # Fallback - assume we need basic dimensions
             adjusted_width = config.width if config.width % 2 == 0 else config.width - 1
             adjusted_height = config.height if config.height % 2 == 0 else config.height - 1
-            scale_filter = f"-vf scale={adjusted_width}:{adjusted_height}:flags=lanczos"
+            scale_filter = f"-vf scale={adjusted_width}:{adjusted_height}:flags=lanczos,unsharp=5:5:1.0:5:5:0.0"
             needs_scaling = True
-            self.log(f"Using fallback dimensions: {adjusted_width}x{adjusted_height}")
+            self.log(f"Using fallback dimensions with sharpen: {adjusted_width}x{adjusted_height}")
 
         # Build FFmpeg command with maximum compatibility
         self.log(f"=== BUILDING FFMPEG COMMAND ===")
@@ -759,7 +761,7 @@ class HTML5ToVideoConverter:
                     "ffmpeg", "-y",
                     "-framerate", str(fallback_fps),
                     "-i", input_pattern,
-                    "-vf", f"scale={fw}:{fh}:flags=lanczos",
+                    "-vf", f"scale={fw}:{fh}:flags=lanczos,unsharp=5:5:1.0:5:5:0.0",
                     "-c:v", "libx264",
                     "-pix_fmt", "yuv420p",
                     "-profile:v", "baseline",
