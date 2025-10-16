@@ -569,7 +569,32 @@ class HTML5ToVideoConverter:
                     style.textContent = `{css_clean}`;
                     document.head.appendChild(style);
 
-                    console.log('Content wrapped and CSS injected for scaling');
+                    // CRITICAL: Ensure canvas elements maintain proper buffer size
+                    // Canvas has internal buffer (width/height attrs) AND CSS size
+                    // Both must match the ORIGINAL dimensions to avoid distortion
+                    var canvases = document.getElementsByTagName('canvas');
+                    for (var i = 0; i < canvases.length; i++) {{
+                        var canvas = canvases[i];
+
+                        // Get current CSS dimensions
+                        var computedStyle = window.getComputedStyle(canvas);
+                        var cssWidth = parseInt(computedStyle.width) || canvas.clientWidth;
+                        var cssHeight = parseInt(computedStyle.height) || canvas.clientHeight;
+
+                        // Ensure internal buffer matches CSS size
+                        // This prevents distortion when canvas is scaled via transform
+                        if (canvas.width !== cssWidth || canvas.height !== cssHeight) {{
+                            console.log('Fixing canvas buffer size:', canvas.width, 'x', canvas.height, '→', cssWidth, 'x', cssHeight);
+                            canvas.width = cssWidth;
+                            canvas.height = cssHeight;
+
+                            // Trigger redraw if there's a render function
+                            if (window.render) window.render();
+                            if (canvas.render) canvas.render();
+                        }}
+                    }}
+
+                    console.log('Content wrapped, CSS injected, and', canvases.length, 'canvas elements fixed');
                 """
                 driver.execute_script(inject_css)
                 self.log(f"Content wrapped in scaling div with transform")
