@@ -30,8 +30,6 @@ class VideoConfig:
     bitrate: str = "10M"
     preset: str = "slow"
     crf: int = 18
-    enable_smart_upscaling: bool = False
-    target_format: str = "original"  # "original", "1080x1080", "1080x1920"
 
 
 class HTML5Analyzer:
@@ -122,87 +120,83 @@ class HTML5Analyzer:
 class FormatCSS:
     """CSS templates for social media formats"""
 
-    CSS_1080x1080 = """
-    <style id="format-override">
-    :root { --safe: 6%; }
-    html, body {
-        margin: 0 !important;
-        padding: 0 !important;
-        background: #000 !important;
-        width: 1080px !important;
-        height: 1080px !important;
-        overflow: hidden !important;
-    }
-    #banner, .frame {
-        width: 1080px !important;
-        height: 1080px !important;
-    }
-    [data-role=headline] {
-        font-size: clamp(24px, 3.4vw, 44px) !important;
-        line-height: 1.1 !important;
-    }
-    [data-role=cta] {
-        position: absolute !important;
-        left: 8% !important;
-        right: 8% !important;
-        bottom: 9% !important;
-        min-height: 56px !important;
-    }
-    [data-role=footers] {
-        position: absolute !important;
-        left: 6% !important;
-        right: 6% !important;
-        top: 6% !important;
-    }
-    [data-role=logo] {
-        position: absolute !important;
-        right: 6% !important;
-        bottom: 6% !important;
-        max-width: 18% !important;
-    }
-    </style>
-    """
+    @staticmethod
+    def generate_css(width: int, height: int, bg_color: str = "#000000") -> str:
+        """Generate format-specific CSS with custom background color"""
 
-    CSS_1080x1920 = """
-    <style id="format-override">
-    :root { --safe: 6%; }
-    html, body {
-        margin: 0 !important;
-        padding: 0 !important;
-        background: #000 !important;
-        width: 1080px !important;
-        height: 1920px !important;
-        overflow: hidden !important;
-    }
-    #banner, .frame {
-        width: 1080px !important;
-        height: 1920px !important;
-    }
-    [data-role=headline] {
-        font-size: clamp(26px, 3.0vw, 52px) !important;
-        line-height: 1.1 !important;
-    }
-    [data-role=cta] {
-        position: absolute !important;
-        left: 8% !important;
-        right: 8% !important;
-        bottom: 8% !important;
-        min-height: 60px !important;
-    }
-    [data-role=footers] {
-        position: absolute !important;
-        left: 6% !important;
-        right: 6% !important;
-        top: 6% !important;
-    }
-    [data-role=logo] {
-        position: absolute !important;
-        right: 6% !important;
-        bottom: 6% !important;
-        max-width: 22% !important;
-    }
-    </style>
-    """
+        # Determine responsive settings based on format
+        if width == height:  # Square
+            headline_size = "clamp(24px, 3.4vw, 44px)"
+            cta_bottom = "9%"
+            logo_width = "18%"
+        else:  # Vertical
+            headline_size = "clamp(26px, 3.0vw, 52px)"
+            cta_bottom = "8%"
+            logo_width = "22%"
+
+        return f"""
+        <style id="format-override">
+        :root {{ --safe: 6%; --bg-color: {bg_color}; }}
+        html, body {{
+            margin: 0 !important;
+            padding: 0 !important;
+            background: var(--bg-color) !important;
+            width: {width}px !important;
+            height: {height}px !important;
+            overflow: hidden !important;
+        }}
+        #banner, .frame {{
+            width: {width}px !important;
+            height: {height}px !important;
+        }}
+        [data-role=headline] {{
+            font-size: {headline_size} !important;
+            line-height: 1.1 !important;
+        }}
+        [data-role=cta] {{
+            position: absolute !important;
+            left: 8% !important;
+            right: 8% !important;
+            bottom: {cta_bottom} !important;
+            min-height: 56px !important;
+        }}
+        [data-role=footers] {{
+            position: absolute !important;
+            left: 6% !important;
+            right: 6% !important;
+            top: 6% !important;
+        }}
+        [data-role=logo] {{
+            position: absolute !important;
+            right: 6% !important;
+            bottom: 6% !important;
+            max-width: {logo_width} !important;
+        }}
+        </style>
+        """
+
+    @staticmethod
+    def detect_best_format(source_width: int, source_height: int) -> tuple:
+        """
+        Detect best social media format based on source aspect ratio.
+        Returns (width, height, format_name)
+        """
+        source_aspect = source_width / source_height
+
+        # 1:1 square format
+        square_aspect = 1.0
+        # 9:16 vertical format
+        vertical_aspect = 9.0 / 16.0
+
+        # Calculate how far source is from each format
+        diff_square = abs(source_aspect - square_aspect)
+        diff_vertical = abs(source_aspect - vertical_aspect)
+
+        # Choose closest format
+        if diff_square < diff_vertical:
+            return (1080, 1080, "1080x1080 (Square/Instagram)")
+        else:
+            return (1080, 1920, "1080x1920 (Vertical/Stories)")
 
 
 class SmartUpscaler:
@@ -420,26 +414,19 @@ class HTML5ToVideoConverter:
         total_frames = config.fps * config.duration
         frame_time_s = 1.0 / config.fps
 
-        # Target dimensions - override if using format CSS injection
-        if config.target_format == "1080x1080":
-            target_width = 1080
-            target_height = 1080
-            use_css_injection = True
-        elif config.target_format == "1080x1920":
-            target_width = 1080
-            target_height = 1920
-            use_css_injection = True
-        else:
-            # Use original dimensions (ensure even for H.264)
-            target_width = config.width if config.width % 2 == 0 else config.width + 1
-            target_height = config.height if config.height % 2 == 0 else config.height + 1
-            use_css_injection = False
-
+        # Auto-detect best social media format based on source dimensions
         self.log(f"=== HTML5 TO VIDEO RENDERING ===")
-        if use_css_injection:
-            self.log(f"Target dimensions: {target_width}x{target_height} (CSS injection mode for {config.target_format})")
-        else:
-            self.log(f"Target dimensions: {target_width}x{target_height} (even-adjusted from {config.width}x{config.height})")
+        self.log(f"Source dimensions: {config.width}x{config.height}")
+
+        # Always use social media format (auto-detect best fit)
+        target_width, target_height, format_name = FormatCSS.detect_best_format(config.width, config.height)
+        source_aspect = config.width / config.height
+        target_aspect = target_width / target_height
+
+        self.log(f"Source aspect ratio: {source_aspect:.3f} ({config.width}:{config.height})")
+        self.log(f"Auto-detected best format: {format_name}")
+        self.log(f"Target aspect ratio: {target_aspect:.3f} ({target_width}:{target_height})")
+        self.log(f"Target dimensions: {target_width}x{target_height}")
         self.log(f"Total frames: {total_frames} ({config.fps} FPS × {config.duration}s)")
         self.log(f"Frame time: {frame_time_s:.4f}s per frame")
 
@@ -506,40 +493,85 @@ class HTML5ToVideoConverter:
             driver.get(file_url)
             self.log(f"Page loaded")
 
-            # Inject format-specific CSS if target format is set
-            if config.target_format in ["1080x1080", "1080x1920"]:
-                self.log(f"=== INJECTING FORMAT CSS ===")
-                self.log(f"Target format: {config.target_format}")
+            # Always inject format-specific CSS for social media
+            self.log(f"=== INJECTING FORMAT CSS ===")
+            self.log(f"Target format: {format_name}")
 
-                # Get appropriate CSS
-                if config.target_format == "1080x1080":
-                    css_code = FormatCSS.CSS_1080x1080
-                else:
-                    css_code = FormatCSS.CSS_1080x1920
+            # Extract predominant background color from page
+            try:
+                bg_color_js = """
+                    function getPredominantColor() {
+                        // Try body background color first
+                        let bodyBg = window.getComputedStyle(document.body).backgroundColor;
+                        if (bodyBg && bodyBg !== 'rgba(0, 0, 0, 0)' && bodyBg !== 'transparent') {
+                            return bodyBg;
+                        }
 
-                # Inject CSS into the page
-                # Clean CSS code for injection (escape backticks)
-                css_clean = css_code.replace('`', '\\`').replace('\n', ' ')
+                        // Try html background color
+                        let htmlBg = window.getComputedStyle(document.documentElement).backgroundColor;
+                        if (htmlBg && htmlBg !== 'rgba(0, 0, 0, 0)' && htmlBg !== 'transparent') {
+                            return htmlBg;
+                        }
 
-                inject_css = f"""
-                    // Remove any existing format override
-                    var existing = document.getElementById('format-override');
-                    if (existing) existing.remove();
+                        // Try first div or main content container
+                        let containers = document.querySelectorAll('div, main, section, #banner, .frame');
+                        for (let el of containers) {
+                            let bg = window.getComputedStyle(el).backgroundColor;
+                            if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+                                return bg;
+                            }
+                        }
 
-                    // Inject new CSS
-                    var style = document.createElement('style');
-                    style.id = 'format-override';
-                    style.textContent = `{css_clean}`;
-                    document.head.appendChild(style);
-
-                    console.log('Format CSS injected for {config.target_format}');
+                        // Default to black
+                        return 'rgb(0, 0, 0)';
+                    }
+                    return getPredominantColor();
                 """
-                driver.execute_script(inject_css)
-                self.log(f"Format CSS injected successfully")
+                bg_color_rgb = driver.execute_script(bg_color_js)
 
-                # Wait a moment for CSS to apply
-                time.sleep(0.3)
-                self.log("Waited for CSS to apply")
+                # Convert RGB to hex
+                if bg_color_rgb and bg_color_rgb.startswith('rgb'):
+                    import re
+                    rgb_match = re.search(r'(\d+),\s*(\d+),\s*(\d+)', bg_color_rgb)
+                    if rgb_match:
+                        r, g, b = map(int, rgb_match.groups())
+                        bg_color_hex = f"#{r:02x}{g:02x}{b:02x}"
+                    else:
+                        bg_color_hex = "#000000"
+                else:
+                    bg_color_hex = bg_color_rgb if bg_color_rgb else "#000000"
+
+                self.log(f"Detected background color: {bg_color_rgb} → {bg_color_hex}")
+            except Exception as e:
+                self.log(f"Could not detect background color, using black: {e}")
+                bg_color_hex = "#000000"
+
+            # Generate CSS with detected background color
+            css_code = FormatCSS.generate_css(target_width, target_height, bg_color_hex)
+
+            # Inject CSS into the page
+            # Clean CSS code for injection (escape backticks)
+            css_clean = css_code.replace('`', '\\`').replace('\n', ' ')
+
+            inject_css = f"""
+                // Remove any existing format override
+                var existing = document.getElementById('format-override');
+                if (existing) existing.remove();
+
+                // Inject new CSS
+                var style = document.createElement('style');
+                style.id = 'format-override';
+                style.textContent = `{css_clean}`;
+                document.head.appendChild(style);
+
+                console.log('Format CSS injected for {target_width}x{target_height}');
+            """
+            driver.execute_script(inject_css)
+            self.log(f"Format CSS injected successfully")
+
+            # Wait a moment for CSS to apply
+            time.sleep(0.3)
+            self.log("Waited for CSS to apply")
 
             # REQUIREMENT #3: Force document and body to EXACT dimensions via JavaScript
             self.log(f"=== APPLYING JAVASCRIPT RESIZE ===")
@@ -1421,24 +1453,8 @@ def main():
             label_visibility="collapsed"
         )
 
-        # Advanced settings expander (always visible)
-        with st.expander("⚙️ Advanced Settings", expanded=False):
-            # Output format selection
-            target_format = st.selectbox(
-                "Output Format",
-                ["Original (Source dimensions)", "1080x1080 (Square/Instagram)", "1080x1920 (Vertical/Stories)"],
-                help="Choose target aspect ratio. Content will be fitted without distortion."
-            )
-
-            # Smart upscaling toggle
-            enable_upscaling = st.checkbox(
-                "Enable Advanced Upscaling",
-                value=False,
-                help="Use spline36 scaler with enhanced sharpening for better quality when upscaling small sources (>1.5x scale factor). Slightly slower but much better quality."
-            )
-
-            if enable_upscaling:
-                st.info("💡 Advanced upscaling improves quality for small sources but may take ~20% longer to encode.")
+        # Info about automatic format detection
+        st.info("ℹ️ Output format is automatically detected (1080x1080 or 1080x1920) based on source aspect ratio")
 
         # Manual mode settings
         if mode == "Manual":
@@ -1542,14 +1558,6 @@ def main():
                 output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
                 output_file.close()
 
-                # Map target format selection to config value
-                if "1080x1080" in target_format:
-                    target_format_value = "1080x1080"
-                elif "1080x1920" in target_format:
-                    target_format_value = "1080x1920"
-                else:
-                    target_format_value = "original"
-
                 config = VideoConfig(
                     width=width,
                     height=height,
@@ -1558,9 +1566,7 @@ def main():
                     codec=codec,
                     bitrate=bitrate,
                     preset=preset,
-                    crf=crf,
-                    enable_smart_upscaling=enable_upscaling,
-                    target_format=target_format_value
+                    crf=crf
                 )
 
                 # Simple progress bar and status
