@@ -1169,7 +1169,10 @@ def main():
 
                 # Complete
                 progress_bar.progress(1.0)
-                status_text.success("Complete") if success else status_text.empty()
+                if success:
+                    status_text.success("Complete")
+                else:
+                    status_text.empty()
 
                 # Show terminal-style debug output (complete log)
                 with st.expander("Debug Details", expanded=False):
