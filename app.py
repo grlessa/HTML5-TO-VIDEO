@@ -993,17 +993,23 @@ def main():
 
         /* Smaller video preview for sharper low-res content */
         .stVideo {
-            max-width: 100%;
+            max-width: 100% !important;
         }
 
         .stVideo video {
-            max-height: 150px;
-            max-width: 100%;
-            width: auto;
-            object-fit: contain;
-            image-rendering: crisp-edges;
-            image-rendering: -moz-crisp-edges;
-            image-rendering: pixelated;
+            max-height: 150px !important;
+            height: 150px !important;
+            max-width: 100% !important;
+            width: auto !important;
+            object-fit: contain !important;
+            image-rendering: crisp-edges !important;
+            image-rendering: -moz-crisp-edges !important;
+            image-rendering: pixelated !important;
+        }
+
+        /* Also target the video element directly */
+        video {
+            max-height: 150px !important;
         }
 
         /* Make expander more discrete */
