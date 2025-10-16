@@ -997,7 +997,7 @@ def main():
         }
 
         .stVideo video {
-            max-height: 200px;
+            max-height: 150px;
             max-width: 100%;
             width: auto;
             object-fit: contain;
