@@ -563,19 +563,34 @@ class HTML5ToVideoConverter:
                 # Apply CSS scaling - browser renders at HIGH RES, content scales to fit
                 css_scaling = f"""
                     // Set html/body to full viewport for high-res rendering
+                    // Use flexbox centering to ensure content is ALWAYS centered in viewport
                     document.documentElement.style.margin = '0';
                     document.documentElement.style.padding = '0';
-                    document.documentElement.style.width = '{target_width}px';
-                    document.documentElement.style.height = '{target_height}px';
+                    document.documentElement.style.width = '100%';
+                    document.documentElement.style.height = '100%';
                     document.documentElement.style.overflow = 'hidden';
                     document.documentElement.style.background = '{bg_color_hex}';
 
                     document.body.style.margin = '0';
                     document.body.style.padding = '0';
+                    document.body.style.width = '100%';
+                    document.body.style.height = '100%';
                     document.body.style.overflow = 'hidden';
                     document.body.style.background = '{bg_color_hex}';
+                    document.body.style.display = 'flex';
+                    document.body.style.alignItems = 'center';
+                    document.body.style.justifyContent = 'center';
 
-                    // Create wrapper for scaled content
+                    // Create container for exact target dimensions (this will be cropped to)
+                    var container = document.createElement('div');
+                    container.id = '__target_container__';
+                    container.style.position = 'relative';
+                    container.style.width = '{target_width}px';
+                    container.style.height = '{target_height}px';
+                    container.style.background = '{bg_color_hex}';
+                    container.style.overflow = 'hidden';
+
+                    // Create wrapper for scaled content inside container
                     var wrapper = document.createElement('div');
                     wrapper.id = '__hires_wrapper__';
                     wrapper.style.position = 'absolute';
@@ -590,7 +605,8 @@ class HTML5ToVideoConverter:
                     while (document.body.firstChild) {{
                         wrapper.appendChild(document.body.firstChild);
                     }}
-                    document.body.appendChild(wrapper);
+                    container.appendChild(wrapper);
+                    document.body.appendChild(container);
 
                     // CRITICAL: Scale canvas internal buffers for sharp rendering
                     var canvases = wrapper.getElementsByTagName('canvas');
