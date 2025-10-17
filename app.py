@@ -563,31 +563,39 @@ class HTML5ToVideoConverter:
                 self.log(f"Centering with padding: {pad_x}px H, {pad_y}px V")
                 self.log(f"Background color: {bg_color_hex}")
 
-                # PROPORTIONAL CSS transform scaling with ABSOLUTE POSITIONING (proven approach from a11c5a2)
+                # PROPORTIONAL CSS transform scaling with FORCED viewport dimensions
                 proportional_scaling = f"""
-                    console.log('Setting up PROPORTIONAL scaling with absolute positioning');
+                    console.log('Setting up PROPORTIONAL scaling with FORCED viewport centering');
 
-                    // Set viewport to target frame size with background
+                    // FORCE viewport to EXACT target frame size
                     document.documentElement.style.margin = '0';
                     document.documentElement.style.padding = '0';
                     document.documentElement.style.width = '{target_width}px';
                     document.documentElement.style.height = '{target_height}px';
+                    document.documentElement.style.minHeight = '{target_height}px';
+                    document.documentElement.style.maxHeight = '{target_height}px';
                     document.documentElement.style.overflow = 'hidden';
                     document.documentElement.style.background = '{bg_color_hex}';
 
+                    // FORCE body to EXACT target frame size (critical for centering!)
                     document.body.style.margin = '0';
                     document.body.style.padding = '0';
+                    document.body.style.width = '{target_width}px';
+                    document.body.style.height = '{target_height}px';
+                    document.body.style.minHeight = '{target_height}px';
+                    document.body.style.maxHeight = '{target_height}px';
                     document.body.style.overflow = 'hidden';
                     document.body.style.background = '{bg_color_hex}';
+                    document.body.style.position = 'relative';  // For absolute positioning context
 
-                    // Create wrapper for scaled content (PROVEN APPROACH from a11c5a2)
+                    // Create wrapper for scaled content
                     var wrapper = document.createElement('div');
                     wrapper.id = '__content_wrapper__';
 
-                    // CRITICAL: Position at calculated offset BEFORE scaling
+                    // CRITICAL: Position at calculated offset for perfect centering
                     wrapper.style.position = 'absolute';
                     wrapper.style.left = '{pad_x}px';     // Horizontal centering offset
-                    wrapper.style.top = '{pad_y}px';      // Vertical centering offset
+                    wrapper.style.top = '{pad_y}px';      // Vertical centering offset (e.g., 150px for 320x480→1080x1920)
                     wrapper.style.width = '{config.width}px';
                     wrapper.style.height = '{config.height}px';
 
@@ -623,13 +631,14 @@ class HTML5ToVideoConverter:
                         if (canvas.render) canvas.render();
                     }}
 
-                    console.log('Proportional scaling with absolute positioning complete');
-                    console.log('Position: absolute, left:{pad_x}px, top:{pad_y}px');
+                    console.log('FORCED viewport centering complete');
+                    console.log('Viewport: FORCED to {target_width}x{target_height}');
+                    console.log('Wrapper position: absolute, left:{pad_x}px, top:{pad_y}px');
                     console.log('Transform: scale({scale_factor}) from top-left');
-                    console.log('Result: Centered {scaled_width}x{scaled_height} in {target_width}x{target_height} frame');
+                    console.log('Result: {scaled_width}x{scaled_height} centered in {target_width}x{target_height} frame');
                 """
                 driver.execute_script(proportional_scaling)
-                self.log(f"Applied PROPORTIONAL transform scaling with absolute positioning (proven approach)")
+                self.log(f"Applied PROPORTIONAL scaling with FORCED viewport dimensions")
             else:
                 # No format change needed - use original dimensions
                 self.log(f"=== STANDARD RENDERING ===")
