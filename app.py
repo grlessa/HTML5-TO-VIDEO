@@ -563,9 +563,9 @@ class HTML5ToVideoConverter:
                 self.log(f"Centering with padding: {pad_x}px H, {pad_y}px V")
                 self.log(f"Background color: {bg_color_hex}")
 
-                # PROPORTIONAL CSS transform scaling with TRUE centering
+                # PROPORTIONAL CSS transform scaling with GUARANTEED centering
                 proportional_scaling = f"""
-                    console.log('Setting up PROPORTIONAL scaling with TRUE vertical centering');
+                    console.log('Setting up PROPORTIONAL scaling with GUARANTEED centering');
 
                     // Set viewport to target frame size with background
                     document.documentElement.style.margin = '0';
@@ -575,47 +575,66 @@ class HTML5ToVideoConverter:
                     document.documentElement.style.overflow = 'hidden';
                     document.documentElement.style.background = '{bg_color_hex}';
 
-                    // Body fills viewport - position wrapper absolutely for centering
+                    // FLEXBOX approach for GUARANTEED vertical centering
                     document.body.style.margin = '0';
                     document.body.style.padding = '0';
                     document.body.style.width = '{target_width}px';
                     document.body.style.height = '{target_height}px';
+                    document.body.style.minHeight = '{target_height}px';
                     document.body.style.overflow = 'hidden';
                     document.body.style.background = '{bg_color_hex}';
-                    document.body.style.position = 'relative';
+
+                    // CRITICAL: Flexbox for vertical AND horizontal centering
+                    document.body.style.display = 'flex';
+                    document.body.style.flexDirection = 'column';
+                    document.body.style.justifyContent = 'center';  // VERTICAL CENTER
+                    document.body.style.alignItems = 'center';      // HORIZONTAL CENTER
 
                     // Create wrapper at NATIVE size for content
                     var wrapper = document.createElement('div');
                     wrapper.id = '__content_wrapper__';
                     wrapper.style.width = '{config.width}px';
                     wrapper.style.height = '{config.height}px';
+                    wrapper.style.position = 'relative';
+                    wrapper.style.flexShrink = '0';  // Prevent flex from shrinking wrapper
 
-                    // CRITICAL: Absolute positioning for TRUE centering
-                    // Position at 50% top/left, then translate back by 50% to center
-                    wrapper.style.position = 'absolute';
-                    wrapper.style.top = '50%';
-                    wrapper.style.left = '50%';
-
-                    // Transform combines centering AND scaling
-                    // translate(-50%, -50%) centers the element
-                    // scale({scale_factor}) scales proportionally
-                    wrapper.style.transform = 'translate(-50%, -50%) scale({scale_factor})';
+                    // CRITICAL: Proportional scaling with transform
+                    wrapper.style.transform = 'scale({scale_factor})';
                     wrapper.style.transformOrigin = 'center center';
 
+                    // Override any positioning from child elements that could break centering
+                    var styleOverride = document.createElement('style');
+                    styleOverride.textContent = `
+                        #__content_wrapper__ > * {{
+                            position: static !important;
+                            margin: 0 !important;
+                            top: auto !important;
+                            bottom: auto !important;
+                            left: auto !important;
+                            right: auto !important;
+                        }}
+                        #__content_wrapper__ {{
+                            /* Ensure wrapper itself isn't repositioned */
+                            margin: 0 !important;
+                            top: auto !important;
+                            bottom: auto !important;
+                        }}
+                    `;
+                    document.head.appendChild(styleOverride);
+
                     // Move all body children into wrapper
-                    while (document.body.firstChild) {{
+                    while (document.body.firstChild && document.body.firstChild !== wrapper) {{
                         wrapper.appendChild(document.body.firstChild);
                     }}
                     document.body.appendChild(wrapper);
 
-                    console.log('Proportional scaling with TRUE centering complete');
-                    console.log('Position: absolute top:50% left:50%');
-                    console.log('Transform: translate(-50%, -50%) scale({scale_factor})');
-                    console.log('Wrapper: {config.width}x{config.height} → {scaled_width}x{scaled_height}');
-                    console.log('Result: PERFECTLY centered in {target_width}x{target_height} frame');
+                    console.log('Proportional scaling with FLEXBOX centering complete');
+                    console.log('Body: display:flex, flexDirection:column, justifyContent:center');
+                    console.log('Wrapper: {config.width}x{config.height}, transform:scale({scale_factor})');
+                    console.log('Result: GUARANTEED centered in {target_width}x{target_height} frame');
                 """
                 driver.execute_script(proportional_scaling)
-                self.log(f"Applied PROPORTIONAL transform scaling with TRUE vertical centering")
+                self.log(f"Applied PROPORTIONAL transform scaling with FLEXBOX centering")
             else:
                 # No format change needed - use original dimensions
                 self.log(f"=== STANDARD RENDERING ===")
