@@ -677,6 +677,34 @@ class HTML5ToVideoConverter:
                 self.log(f"High-res viewport match: {hires_match}")
                 if actual_viewport_w != target_width or actual_viewport_h != target_height:
                     self.log(f"WARNING: Viewport mismatch! Expected {target_width}x{target_height}, got {actual_viewport_w}x{actual_viewport_h}")
+                    self.log(f"CORRECTING viewport dimensions...")
+
+                    # CRITICAL FIX: Force viewport to exact dimensions
+                    # Chrome subtracts UI chrome, we need to compensate
+                    height_diff = target_height - actual_viewport_h
+                    width_diff = target_width - actual_viewport_w
+
+                    self.log(f"Height shortfall: {height_diff}px, Width shortfall: {width_diff}px")
+
+                    # Resize window to compensate for Chrome UI
+                    corrected_width = target_width + width_diff
+                    corrected_height = target_height + height_diff
+
+                    self.log(f"Resizing window to: {corrected_width}x{corrected_height} (to achieve {target_width}x{target_height} viewport)")
+                    driver.set_window_size(corrected_width, corrected_height)
+
+                    # Wait for resize
+                    time.sleep(0.5)
+
+                    # Verify correction
+                    new_viewport_w = driver.execute_script("return window.innerWidth;")
+                    new_viewport_h = driver.execute_script("return window.innerHeight;")
+                    self.log(f"After correction: {new_viewport_w}x{new_viewport_h}")
+
+                    if new_viewport_w == target_width and new_viewport_h == target_height:
+                        self.log(f"✓ Viewport corrected successfully!")
+                    else:
+                        self.log(f"⚠ Viewport still mismatched, will continue anyway")
             else:
                 native_match = 'YES' if actual_viewport_w == config.width and actual_viewport_h == config.height else 'NO'
                 self.log(f"Native size match: {native_match}")
