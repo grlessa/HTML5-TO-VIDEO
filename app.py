@@ -31,6 +31,7 @@ class VideoConfig:
     animation_speed: float = 1.0  # 1.0 = normal speed, 0.85 = 15% slower, 1.5 = 50% faster
     preset: str = "slow"
     crf: int = 18
+    target_format: str = "auto"  # "auto", "square", or "vertical"
 
 
 class HTML5Analyzer:
@@ -404,8 +405,15 @@ class HTML5ToVideoConverter:
         self.log(f"=== HTML5 TO VIDEO RENDERING ===")
         self.log(f"Source dimensions: {config.width}x{config.height}")
 
-        # Always use social media format (auto-detect best fit)
-        target_width, target_height, format_name = FormatCSS.detect_best_format(config.width, config.height)
+        # Use social media format (auto-detect or manual selection)
+        if config.target_format == "square":
+            target_width, target_height, format_name = 1080, 1080, "1080x1080 (Square/Instagram)"
+            self.log(f"Using manual format selection: {format_name}")
+        elif config.target_format == "vertical":
+            target_width, target_height, format_name = 1080, 1920, "1080x1920 (Vertical/Stories)"
+            self.log(f"Using manual format selection: {format_name}")
+        else:  # auto
+            target_width, target_height, format_name = FormatCSS.detect_best_format(config.width, config.height)
         source_aspect = config.width / config.height
         target_aspect = target_width / target_height
 
@@ -1564,22 +1572,6 @@ def main():
             help="ZIP file containing HTML, CSS, JS, images, and all assets"
         )
 
-        # Simple settings toggle
-        mode = st.radio(
-            "Mode",
-            ["Auto", "Manual"],
-            horizontal=True,
-            label_visibility="collapsed"
-        )
-
-        # Info about automatic format detection
-        st.info("ℹ️ Output format is automatically detected (1080x1080 or 1080x1920) based on source aspect ratio")
-
-        # Manual mode settings (will be populated after file upload for auto-detect options)
-        if mode == "Manual":
-            # Placeholder - will be filled after file upload with auto-detect options
-            pass
-
     # Right column: Preview area (placeholder initially)
     with right_col:
         preview_container = st.container()
@@ -1640,81 +1632,74 @@ def main():
 
                 shutil.rmtree(temp_extract)
 
-            # Mode-specific UI
-            if mode == "Auto":
-                width = detected_width
-                height = detected_height
-                duration = detected_duration
-                fps = detected_fps
+            # Unified auto-detect UI with optional overrides
+            st.write("**Auto-detected settings:**")
 
-                st.write("**Auto-detected settings:**")
-                col1, col2, col3, col4 = st.columns(4)
-                col1.metric("Resolution", f"{width}x{height}")
-                col2.metric("FPS", fps)
-                col3.metric("Duration", f"{duration}s")
-                col4.metric("Quality", "High")
+            # Use auto-detected values by default
+            width = detected_width
+            height = detected_height
+            fps = detected_fps
 
-                # Detect and show output format
-                from app import FormatCSS
-                output_width, output_height, format_name = FormatCSS.detect_best_format(width, height)
-                st.info(f"📐 **Output Format:** {format_name} - Your content will be automatically fitted to {output_width}x{output_height} with aspect ratio preserved")
+            # Show detected values (read-only)
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Resolution", f"{width}x{height}", help="Auto-detected from HTML5 content")
+            with col2:
+                st.metric("FPS", fps, help="Auto-detected from animations")
+            with col3:
+                st.metric("Quality", "High", help="Optimized encoding settings")
 
-                # Use optimal settings for high quality (compatible with st.video)
-                codec = "libx264"
-                preset = "slow"
-                crf = 18  # High quality (compatible with web players)
-                bitrate = "10M"
-                animation_speed = 1.0  # Normal speed by default
+            # Duration control with checkbox
+            st.markdown("**Duration**")
+            col1, col2 = st.columns([1, 4])
+            with col1:
+                use_custom_duration = st.checkbox("Custom", value=False, key="custom_duration", help="Override auto-detected duration")
+            with col2:
+                if use_custom_duration:
+                    duration = st.number_input("Duration (seconds)", 1, 300, detected_duration, key="duration_input")
+                else:
+                    duration = detected_duration
+                    st.number_input("Duration (seconds)", 1, 300, duration, disabled=True, key="duration_input")
 
-            else:  # Manual mode
-                st.markdown("**Manual Settings**")
-                st.info(f"💡 Auto-detected: {detected_width}x{detected_height}, {detected_fps} FPS, {detected_duration}s duration")
+            # Output format control with checkbox
+            st.markdown("**Output Format**")
+            from app import FormatCSS
+            auto_output_width, auto_output_height, auto_format_name = FormatCSS.detect_best_format(width, height)
 
-                # Use auto-detected values for width, height, fps
-                width = detected_width
-                height = detected_height
-                fps = detected_fps
+            use_auto_format = st.checkbox("Auto-detect format", value=True, key="auto_format", help="Automatically choose between Square and Vertical based on aspect ratio")
 
-                # Show detected values (read-only)
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Width", f"{width}px", help="Auto-detected from HTML5 content")
-                with col2:
-                    st.metric("Height", f"{height}px", help="Auto-detected from HTML5 content")
-                with col3:
-                    st.metric("FPS", fps, help="Auto-detected from animations")
+            if use_auto_format:
+                st.info(f"📐 Auto-detected: **{auto_format_name}** ({auto_output_width}x{auto_output_height})")
+                target_format = "auto"
+            else:
+                format_option = st.selectbox(
+                    "Choose output format",
+                    ["1080x1080 (Square/Instagram)", "1080x1920 (Vertical/Stories)"],
+                    key="format_select"
+                )
+                # Map selection to target_format value
+                if "1080x1080" in format_option:
+                    target_format = "square"
+                else:
+                    target_format = "vertical"
 
-                # Duration with optional manual override
-                st.markdown("**Duration Control**")
-                col1, col2 = st.columns([1, 4])
-                with col1:
-                    use_custom_duration = st.checkbox("Custom", value=False, key="custom_duration", help="Override auto-detected duration")
-                with col2:
-                    if use_custom_duration:
-                        duration = st.number_input("Duration (seconds)", 1, 300, detected_duration, key="duration_input")
-                    else:
-                        duration = detected_duration
-                        st.number_input("Duration (seconds)", 1, 300, duration, disabled=True, key="duration_input")
+            # Use optimal settings for high quality
+            codec = "libx264"
+            preset = "slow"
+            crf = 18
+            bitrate = "10M"
+            animation_speed = 1.0  # Normal speed
 
-                # Animation speed always normal by default
-                animation_speed = 1.0
+            # Validate total computational load
+            total_frames = fps * duration
+            total_pixels = width * height * total_frames
 
-                # Use optimal settings for high quality
-                codec = "libx264"
-                preset = "slow"
-                crf = 18
-                bitrate = "10M"
-
-                # Validate total computational load
-                total_frames = fps * duration
-                total_pixels = width * height * total_frames
-
-                # Max: 4K @ 60fps for 60 seconds = 497,664,000 pixels
-                max_pixels = 3840 * 2160 * 60 * 60
-                if total_pixels > max_pixels:
-                    st.error("❌ Configuration too demanding")
-                    st.info(f"Total processing load: {total_pixels:,} pixel-frames. Maximum: {max_pixels:,}. Try reducing resolution, FPS, or duration.")
-                    st.stop()
+            # Max: 4K @ 60fps for 60 seconds = 497,664,000 pixels
+            max_pixels = 3840 * 2160 * 60 * 60
+            if total_pixels > max_pixels:
+                st.error("❌ Configuration too demanding")
+                st.info(f"Total processing load: {total_pixels:,} pixel-frames. Maximum: {max_pixels:,}. Try reducing duration.")
+                st.stop()
 
             # Convert button
             if st.button("Convert to Video", use_container_width=True):
@@ -1730,7 +1715,8 @@ def main():
                     bitrate=bitrate,
                     preset=preset,
                     crf=crf,
-                    animation_speed=animation_speed
+                    animation_speed=animation_speed,
+                    target_format=target_format
                 )
 
                 # Simple progress bar and status
