@@ -897,12 +897,12 @@ class HTML5ToVideoConverter:
                     return None
 
                 # Set animation time for this frame
-                # Apply animation speed multiplier (e.g., 0.85 = 15% slower)
-                elapsed_ms = frame_num * frame_time_s * config.animation_speed * 1000
+                # Capture animation at NORMAL speed - we'll slow down playback via FFmpeg FPS
+                elapsed_ms = frame_num * frame_time_s * 1000
 
                 if frame_num % 30 == 0:  # Log every 30 frames
-                    elapsed_time = frame_num * frame_time_s * config.animation_speed
-                    self.log(f"Animation at {elapsed_time:.2f}s (frame {frame_num}, speed: {config.animation_speed}x)")
+                    elapsed_time = frame_num * frame_time_s
+                    self.log(f"Animation at {elapsed_time:.2f}s (frame {frame_num}), will play at {config.animation_speed}x speed")
 
                 # Control animation timing precisely using Web Animations API
                 driver.execute_script(f"""
@@ -1159,10 +1159,18 @@ class HTML5ToVideoConverter:
         self.log(f"Preset: {config.preset}")
         self.log(f"Bitrate: {config.bitrate}")
 
+        # Calculate effective output FPS based on animation speed
+        # If animation_speed = 0.85, we want video to play 15% slower
+        # So output FPS should be 85% of capture FPS (60 * 0.85 = 51 FPS)
+        output_fps = config.fps * config.animation_speed
+        self.log(f"Animation speed multiplier: {config.animation_speed}x")
+        self.log(f"Input framerate (capture): {config.fps} FPS")
+        self.log(f"Output framerate (playback): {output_fps:.2f} FPS")
+
         ffmpeg_cmd = [
             "ffmpeg",
             "-y",  # Overwrite output
-            "-framerate", str(config.fps),
+            "-framerate", str(config.fps),  # Input: how fast frames were captured
             "-i", input_pattern,
         ]
 
@@ -1174,6 +1182,7 @@ class HTML5ToVideoConverter:
         ffmpeg_cmd.extend([
             "-c:v", config.codec,
             "-pix_fmt", "yuv420p",
+            "-r", str(output_fps),  # Output framerate for playback speed control
         ])
 
         # Add codec-specific settings - keep it SIMPLE for cloud compatibility
