@@ -28,6 +28,7 @@ class VideoConfig:
     duration: int
     codec: str = "libx264"
     bitrate: str = "10M"
+    animation_speed: float = 0.85  # 0.85 = 15% slower, 1.0 = normal speed
     preset: str = "slow"
     crf: int = 18
 
@@ -414,6 +415,7 @@ class HTML5ToVideoConverter:
         self.log(f"Target dimensions: {target_width}x{target_height}")
         self.log(f"Total frames: {total_frames} ({config.fps} FPS × {config.duration}s)")
         self.log(f"Frame time: {frame_time_s:.4f}s per frame")
+        self.log(f"Animation speed: {config.animation_speed}x ({int((1-config.animation_speed)*100)}% slower)" if config.animation_speed < 1.0 else f"Animation speed: {config.animation_speed}x ({int((config.animation_speed-1)*100)}% faster)" if config.animation_speed > 1.0 else "Animation speed: 1.0x (normal)")
 
         # Calculate PROPORTIONAL scale factor BEFORE browser setup
         scale_factor_w = target_width / config.width
@@ -895,11 +897,12 @@ class HTML5ToVideoConverter:
                     return None
 
                 # Set animation time for this frame
-                elapsed_ms = frame_num * frame_time_s * 1000
+                # Apply animation speed multiplier (e.g., 0.85 = 15% slower)
+                elapsed_ms = frame_num * frame_time_s * config.animation_speed * 1000
 
                 if frame_num % 30 == 0:  # Log every 30 frames
-                    elapsed_time = frame_num * frame_time_s
-                    self.log(f"Animation at {elapsed_time:.2f}s (frame {frame_num})")
+                    elapsed_time = frame_num * frame_time_s * config.animation_speed
+                    self.log(f"Animation at {elapsed_time:.2f}s (frame {frame_num}, speed: {config.animation_speed}x)")
 
                 # Control animation timing precisely using Web Animations API
                 driver.execute_script(f"""
@@ -1550,6 +1553,17 @@ def main():
                 height = st.number_input("Height", 100, 2160, 1080)  # Cap at 4K
                 duration = st.number_input("Duration", 1, 300, 10)  # Cap at 5 minutes
 
+            # Animation speed control
+            st.markdown("**Animation Speed**")
+            animation_speed = st.slider(
+                "Animation playback speed",
+                min_value=0.5,
+                max_value=1.5,
+                value=0.85,
+                step=0.05,
+                help="Adjust animation playback speed. 0.85 = 15% slower (recommended), 1.0 = normal speed, 1.5 = 50% faster"
+            )
+
             # Validate total computational load
             total_frames = fps * duration
             total_pixels = width * height * total_frames
@@ -1617,11 +1631,12 @@ def main():
                         fps = detected['fps']
 
                         st.write("**Auto-detected settings:**")
-                        col1, col2, col3, col4 = st.columns(4)
+                        col1, col2, col3, col4, col5 = st.columns(5)
                         col1.metric("Resolution", f"{width}x{height}")
                         col2.metric("FPS", fps)
                         col3.metric("Duration", f"{duration}s")
                         col4.metric("Quality", "High")
+                        col5.metric("Anim Speed", "0.85x")
 
                         # Detect and show output format
                         from app import FormatCSS
@@ -1633,11 +1648,13 @@ def main():
                         preset = "slow"
                         crf = 18  # High quality (compatible with web players)
                         bitrate = "10M"
+                        animation_speed = 0.85  # Default: 15% slower for better visibility
 
                     else:
                         st.warning("No HTML files found, using defaults")
                         width, height, fps, duration = 1920, 1080, 60, 10
                         codec, preset, crf, bitrate = "libx264", "slow", 18, "10M"
+                        animation_speed = 0.85  # Default: 15% slower for better visibility
 
                     shutil.rmtree(temp_extract)
 
@@ -1654,7 +1671,8 @@ def main():
                     codec=codec,
                     bitrate=bitrate,
                     preset=preset,
-                    crf=crf
+                    crf=crf,
+                    animation_speed=animation_speed
                 )
 
                 # Simple progress bar and status
