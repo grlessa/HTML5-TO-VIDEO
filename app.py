@@ -415,6 +415,15 @@ class HTML5ToVideoConverter:
         self.log(f"Total frames: {total_frames} ({config.fps} FPS × {config.duration}s)")
         self.log(f"Frame time: {frame_time_s:.4f}s per frame")
 
+        # Calculate scale factor BEFORE browser setup
+        scale_factor_w = target_width / config.width
+        scale_factor_h = target_height / config.height
+        scale_factor = min(scale_factor_w, scale_factor_h)  # Use min to fit within target
+        needs_format_change = (target_width != config.width or target_height != config.height)
+
+        self.log(f"Scale factor: {scale_factor:.2f}x (w:{scale_factor_w:.2f}x, h:{scale_factor_h:.2f}x)")
+        self.log(f"Format change needed: {needs_format_change}")
+
         # Chrome options - REQUIREMENT #1: Set window size in chrome_options
         self.log(f"=== BROWSER INITIALIZATION ===")
         chrome_options = Options()
@@ -432,7 +441,7 @@ class HTML5ToVideoConverter:
 
         # CRITICAL: Use high device scale factor for crisp rendering
         # This makes the browser render at high DPI while keeping layout at native size
-        device_scale = scale
+        device_scale = scale_factor
         chrome_options.add_argument(f'--force-device-scale-factor={device_scale}')
         self.log(f"Chrome --window-size: {window_size} (native: {config.width}x{config.height})")
         self.log(f"Chrome --force-device-scale-factor: {device_scale} (for high-DPI rendering)")
@@ -483,16 +492,7 @@ class HTML5ToVideoConverter:
             driver.get(file_url)
             self.log(f"Page loaded")
 
-            # Calculate if we're changing format (will use FFmpeg padding instead of browser scaling)
-            scale_factor_w = target_width / config.width
-            scale_factor_h = target_height / config.height
-            scale_factor = max(scale_factor_w, scale_factor_h)
-            needs_format_change = (target_width != config.width or target_height != config.height)
-
-            self.log(f"Scale factor: {scale_factor:.2f}x (w:{scale_factor_w:.2f}x, h:{scale_factor_h:.2f}x)")
-            self.log(f"Format change needed: {needs_format_change}")
-
-            # Extract background color and apply CSS scaling for high-res rendering
+            # Extract background color and apply minimal CSS for high-res rendering
             bg_color_hex = "#000000"  # default
             if needs_format_change:
                 self.log(f"=== HIGH-RESOLUTION RENDERING SETUP ===")
@@ -547,32 +547,13 @@ class HTML5ToVideoConverter:
                     self.log(f"Could not detect background color, using black: {e}")
                     bg_color_hex = "#000000"
 
-                # Calculate scaling for high-res rendering
-                scale_x = target_width / config.width
-                scale_y = target_height / config.height
-                scale = min(scale_x, scale_y)  # fit to viewport
-
-                scaled_width = int(config.width * scale)
-                scaled_height = int(config.height * scale)
-
-                offset_x = (target_width - scaled_width) // 2
-                offset_y = (target_height - scaled_height) // 2
-
-                self.log(f"Browser viewport: {target_width}x{target_height} (HIGH-RES)")
-                self.log(f"HTML5 native: {config.width}x{config.height}")
-                self.log(f"Scale factor: {scale:.3f}x")
-                self.log(f"Scaled content: {scaled_width}x{scaled_height}")
-                self.log(f"Centered with offset: {offset_x}px left, {offset_y}px top")
+                # Log high-DPI rendering strategy
+                self.log(f"=== HIGH-DPI RENDERING STRATEGY ===")
+                self.log(f"Browser viewport: {config.width}x{config.height} (NATIVE)")
+                self.log(f"Device scale factor: {scale_factor:.3f}x")
+                self.log(f"Expected screenshot size: {int(config.width * scale_factor)}x{int(config.height * scale_factor)}")
+                self.log(f"FFmpeg will pad to: {target_width}x{target_height}")
                 self.log(f"Background color for padding: {bg_color_hex}")
-
-                # INTEGER SCALING APPROACH: Render at native resolution, let FFmpeg handle upscaling
-                # This is the ONLY reliable way to handle non-responsive HTML5 ads
-                # We render at NATIVE size then use FFmpeg's high-quality scalers
-
-                self.log(f"=== RENDERING STRATEGY: NATIVE + FFMPEG UPSCALING ===")
-                self.log(f"HTML5 ads are designed with fixed pixels and are NOT responsive")
-                self.log(f"Best approach: Render at native {config.width}x{config.height}, upscale with FFmpeg")
-                self.log(f"FFmpeg will use high-quality lanczos scaler with sharpening")
 
                 # Simple CSS reset - don't try to scale or manipulate layout
                 simple_reset = f"""
