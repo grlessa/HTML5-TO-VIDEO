@@ -563,9 +563,9 @@ class HTML5ToVideoConverter:
                 self.log(f"Centering with padding: {pad_x}px H, {pad_y}px V")
                 self.log(f"Background color: {bg_color_hex}")
 
-                # PROPORTIONAL CSS transform scaling with centering
+                # PROPORTIONAL CSS transform scaling with TRUE centering
                 proportional_scaling = f"""
-                    console.log('Setting up PROPORTIONAL scaling with centering');
+                    console.log('Setting up PROPORTIONAL scaling with TRUE vertical centering');
 
                     // Set viewport to target frame size with background
                     document.documentElement.style.margin = '0';
@@ -575,26 +575,31 @@ class HTML5ToVideoConverter:
                     document.documentElement.style.overflow = 'hidden';
                     document.documentElement.style.background = '{bg_color_hex}';
 
-                    // Body fills viewport with flexbox centering
+                    // Body fills viewport - position wrapper absolutely for centering
                     document.body.style.margin = '0';
                     document.body.style.padding = '0';
                     document.body.style.width = '{target_width}px';
                     document.body.style.height = '{target_height}px';
                     document.body.style.overflow = 'hidden';
                     document.body.style.background = '{bg_color_hex}';
-                    document.body.style.display = 'flex';
-                    document.body.style.alignItems = 'center';
-                    document.body.style.justifyContent = 'center';
+                    document.body.style.position = 'relative';
 
                     // Create wrapper at NATIVE size for content
                     var wrapper = document.createElement('div');
                     wrapper.id = '__content_wrapper__';
                     wrapper.style.width = '{config.width}px';
                     wrapper.style.height = '{config.height}px';
-                    wrapper.style.position = 'relative';
 
-                    // CRITICAL: Proportional scaling with transform (uniform scale!)
-                    wrapper.style.transform = 'scale({scale_factor})';
+                    // CRITICAL: Absolute positioning for TRUE centering
+                    // Position at 50% top/left, then translate back by 50% to center
+                    wrapper.style.position = 'absolute';
+                    wrapper.style.top = '50%';
+                    wrapper.style.left = '50%';
+
+                    // Transform combines centering AND scaling
+                    // translate(-50%, -50%) centers the element
+                    // scale({scale_factor}) scales proportionally
+                    wrapper.style.transform = 'translate(-50%, -50%) scale({scale_factor})';
                     wrapper.style.transformOrigin = 'center center';
 
                     // Move all body children into wrapper
@@ -603,12 +608,14 @@ class HTML5ToVideoConverter:
                     }}
                     document.body.appendChild(wrapper);
 
-                    console.log('Proportional scaling setup complete');
-                    console.log('Scale factor: {scale_factor} (uniform - no stretching)');
+                    console.log('Proportional scaling with TRUE centering complete');
+                    console.log('Position: absolute top:50% left:50%');
+                    console.log('Transform: translate(-50%, -50%) scale({scale_factor})');
                     console.log('Wrapper: {config.width}x{config.height} → {scaled_width}x{scaled_height}');
+                    console.log('Result: PERFECTLY centered in {target_width}x{target_height} frame');
                 """
                 driver.execute_script(proportional_scaling)
-                self.log(f"Applied PROPORTIONAL transform scaling (no stretching)")
+                self.log(f"Applied PROPORTIONAL transform scaling with TRUE vertical centering")
             else:
                 # No format change needed - use original dimensions
                 self.log(f"=== STANDARD RENDERING ===")
