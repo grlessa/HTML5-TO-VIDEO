@@ -28,7 +28,7 @@ class VideoConfig:
     duration: int
     codec: str = "libx264"
     bitrate: str = "10M"
-    animation_speed: float = 0.85  # 0.85 = 15% slower, 1.0 = normal speed
+    animation_speed: float = 1.0  # 1.0 = normal speed, 0.85 = 15% slower, 1.5 = 50% faster
     preset: str = "slow"
     crf: int = 18
 
@@ -1648,12 +1648,11 @@ def main():
                 fps = detected_fps
 
                 st.write("**Auto-detected settings:**")
-                col1, col2, col3, col4, col5 = st.columns(5)
+                col1, col2, col3, col4 = st.columns(4)
                 col1.metric("Resolution", f"{width}x{height}")
                 col2.metric("FPS", fps)
                 col3.metric("Duration", f"{duration}s")
                 col4.metric("Quality", "High")
-                col5.metric("Anim Speed", "0.85x")
 
                 # Detect and show output format
                 from app import FormatCSS
@@ -1665,66 +1664,40 @@ def main():
                 preset = "slow"
                 crf = 18  # High quality (compatible with web players)
                 bitrate = "10M"
-                animation_speed = 0.85  # Default: 15% slower for better visibility
+                animation_speed = 1.0  # Normal speed by default
 
             else:  # Manual mode
-                st.markdown("**Manual Settings with Auto-Detect Options**")
+                st.markdown("**Manual Settings**")
                 st.info(f"💡 Auto-detected: {detected_width}x{detected_height}, {detected_fps} FPS, {detected_duration}s duration")
 
-                # Width
-                col1, col2 = st.columns([1, 4])
-                with col1:
-                    use_auto_width = st.checkbox("Auto", value=False, key="auto_width", help="Use auto-detected width")
-                with col2:
-                    if use_auto_width:
-                        width = detected_width
-                        st.number_input("Width", 100, 3840, width, disabled=True, key="width_input")
-                    else:
-                        width = st.number_input("Width", 100, 3840, detected_width, key="width_input")
+                # Use auto-detected values for width, height, fps
+                width = detected_width
+                height = detected_height
+                fps = detected_fps
 
-                # Height
-                col1, col2 = st.columns([1, 4])
+                # Show detected values (read-only)
+                col1, col2, col3 = st.columns(3)
                 with col1:
-                    use_auto_height = st.checkbox("Auto", value=False, key="auto_height", help="Use auto-detected height")
+                    st.metric("Width", f"{width}px", help="Auto-detected from HTML5 content")
                 with col2:
-                    if use_auto_height:
-                        height = detected_height
-                        st.number_input("Height", 100, 2160, height, disabled=True, key="height_input")
-                    else:
-                        height = st.number_input("Height", 100, 2160, detected_height, key="height_input")
+                    st.metric("Height", f"{height}px", help="Auto-detected from HTML5 content")
+                with col3:
+                    st.metric("FPS", fps, help="Auto-detected from animations")
 
-                # FPS
+                # Duration with optional manual override
+                st.markdown("**Duration Control**")
                 col1, col2 = st.columns([1, 4])
                 with col1:
-                    use_auto_fps = st.checkbox("Auto", value=False, key="auto_fps", help="Use auto-detected FPS")
+                    use_custom_duration = st.checkbox("Custom", value=False, key="custom_duration", help="Override auto-detected duration")
                 with col2:
-                    if use_auto_fps:
-                        fps = detected_fps
-                        st.number_input("FPS", 1, 60, fps, disabled=True, key="fps_input")
+                    if use_custom_duration:
+                        duration = st.number_input("Duration (seconds)", 1, 300, detected_duration, key="duration_input")
                     else:
-                        fps = st.number_input("FPS", 1, 60, detected_fps, key="fps_input")
-
-                # Duration
-                col1, col2 = st.columns([1, 4])
-                with col1:
-                    use_auto_duration = st.checkbox("Auto", value=False, key="auto_duration", help="Use auto-detected duration")
-                with col2:
-                    if use_auto_duration:
                         duration = detected_duration
                         st.number_input("Duration (seconds)", 1, 300, duration, disabled=True, key="duration_input")
-                    else:
-                        duration = st.number_input("Duration (seconds)", 1, 300, detected_duration, key="duration_input")
 
-                # Animation speed control
-                st.markdown("**Animation Speed**")
-                animation_speed = st.slider(
-                    "Animation playback speed",
-                    min_value=0.5,
-                    max_value=1.5,
-                    value=0.85,
-                    step=0.05,
-                    help="Adjust animation playback speed. 0.85 = 15% slower (recommended), 1.0 = normal speed, 1.5 = 50% faster"
-                )
+                # Animation speed always normal by default
+                animation_speed = 1.0
 
                 # Use optimal settings for high quality
                 codec = "libx264"
