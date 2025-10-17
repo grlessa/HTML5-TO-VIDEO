@@ -907,6 +907,7 @@ class HTML5ToVideoConverter:
                 # Control animation timing precisely using Web Animations API
                 driver.execute_script(f"""
                     var elapsedMs = {elapsed_ms};
+                    var elapsedSeconds = elapsedMs / 1000.0;
 
                     // Update all paused CSS animations to exact time
                     if (window.__animationElements) {{
@@ -915,13 +916,36 @@ class HTML5ToVideoConverter:
                         }});
                     }}
 
-                    // Update time for JavaScript animations
+                    // Update time for CreateJS animations (seek to specific time)
                     if (typeof createjs !== 'undefined' && createjs.Ticker) {{
-                        createjs.Ticker._tick();
+                        // Set Ticker time directly
+                        var tickEvent = new createjs.Event("tick");
+                        tickEvent.delta = 16.67; // Simulate 60fps tick
+                        tickEvent.time = elapsedMs;
+                        tickEvent.runTime = elapsedMs;
+                        createjs.Ticker._listeners.forEach(function(listener) {{
+                            if (listener && listener.handleEvent) {{
+                                listener.handleEvent(tickEvent);
+                            }}
+                        }});
                     }}
 
-                    if (typeof gsap !== 'undefined' && gsap.globalTimeline) {{
-                        gsap.ticker.tick();
+                    // Update GSAP global timeline to exact time
+                    if (typeof gsap !== 'undefined') {{
+                        // Seek GSAP global timeline to specific time
+                        if (gsap.globalTimeline) {{
+                            gsap.globalTimeline.time(elapsedSeconds);
+                        }}
+                        // Also update any explicit timelines
+                        if (gsap.exportRoot) {{
+                            var root = gsap.exportRoot();
+                            root.time(elapsedSeconds);
+                        }}
+                    }}
+
+                    // Update canvas animations that use requestAnimationFrame
+                    if (window.animationStartTime) {{
+                        window.animationStartTime = Date.now() - elapsedMs;
                     }}
 
                     // Force reflow
