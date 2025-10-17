@@ -567,6 +567,15 @@ class HTML5ToVideoConverter:
                 proportional_scaling = f"""
                     console.log('Setting up PROPORTIONAL scaling with FORCED viewport centering');
 
+                    // Add emoji font support
+                    var emojiStyle = document.createElement('style');
+                    emojiStyle.textContent = `
+                        * {{
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Segoe UI Emoji", "Segoe UI Symbol", "Apple Color Emoji", "Noto Color Emoji", sans-serif !important;
+                        }}
+                    `;
+                    document.head.appendChild(emojiStyle);
+
                     // FORCE viewport to EXACT target frame size
                     document.documentElement.style.margin = '0';
                     document.documentElement.style.padding = '0';
@@ -643,6 +652,15 @@ class HTML5ToVideoConverter:
                 # No format change needed - use original dimensions
                 self.log(f"=== STANDARD RENDERING ===")
                 js_standard = f"""
+                    // Add emoji font support
+                    var emojiStyle = document.createElement('style');
+                    emojiStyle.textContent = `
+                        * {{
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Segoe UI Emoji", "Segoe UI Symbol", "Apple Color Emoji", "Noto Color Emoji", sans-serif !important;
+                        }}
+                    `;
+                    document.head.appendChild(emojiStyle);
+
                     document.documentElement.style.margin = '0';
                     document.documentElement.style.padding = '0';
                     document.documentElement.style.overflow = 'hidden';
@@ -652,7 +670,7 @@ class HTML5ToVideoConverter:
                     document.body.style.overflow = 'hidden';
                 """
                 driver.execute_script(js_standard)
-                self.log(f"Using standard rendering at {config.width}x{config.height}")
+                self.log(f"Using standard rendering at {config.width}x{config.height} with emoji font support")
 
             # REQUIREMENT #4: Delay for page to settle
             self.log("Waiting 1.5s for page to settle...")
