@@ -23,7 +23,8 @@
       "Bash(git log:*)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(/Users/lessafilms/Library/Python/3.9/bin/cython --version)"
+      "Bash(/Users/lessafilms/Library/Python/3.9/bin/cython --version)",
+      "Bash(pkill:*)"
     ],
     "deny": [],
     "ask": []

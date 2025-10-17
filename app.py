@@ -423,14 +423,19 @@ class HTML5ToVideoConverter:
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-gpu')
         chrome_options.add_argument('--hide-scrollbars')
-        chrome_options.add_argument('--force-device-scale-factor=1')
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-        # Set window to TARGET resolution for sharp rendering
-        # Browser will render at high-res, then we'll scale content with CSS
-        height_buffer = max(150, int(target_height * 0.3))  # At least 150px or 30% of height
-        window_size = f'{target_width},{target_height + height_buffer}'
+
+        # Set window to NATIVE resolution (source dimensions)
+        # Use device-scale-factor for high-DPI rendering without breaking layout
+        window_size = f'{config.width},{config.height}'
         chrome_options.add_argument(f'--window-size={window_size}')
-        self.log(f"Chrome --window-size: {window_size} (target: {target_width}x{target_height}, buffer: {height_buffer}px)")
+
+        # CRITICAL: Use high device scale factor for crisp rendering
+        # This makes the browser render at high DPI while keeping layout at native size
+        device_scale = scale
+        chrome_options.add_argument(f'--force-device-scale-factor={device_scale}')
+        self.log(f"Chrome --window-size: {window_size} (native: {config.width}x{config.height})")
+        self.log(f"Chrome --force-device-scale-factor: {device_scale} (for high-DPI rendering)")
 
         # Find browser binary
         browser_paths = [
@@ -467,10 +472,10 @@ class HTML5ToVideoConverter:
             return None
 
         try:
-            # Set window to TARGET resolution via Selenium (in addition to chrome_options)
+            # Set window to NATIVE resolution via Selenium
             self.log(f"=== PAGE LOADING ===")
-            driver.set_window_size(target_width, target_height + height_buffer)
-            self.log(f"Selenium set_window_size called: {target_width}x{target_height + height_buffer}")
+            driver.set_window_size(config.width, config.height)
+            self.log(f"Selenium set_window_size called: {config.width}x{config.height} (native)")
 
             # Load HTML
             file_url = f"file://{html_path}"
@@ -560,201 +565,32 @@ class HTML5ToVideoConverter:
                 self.log(f"Centered with offset: {offset_x}px left, {offset_y}px top")
                 self.log(f"Background color for padding: {bg_color_hex}")
 
-                # Apply CSS zoom for high-res rendering with proper layout
-                # CSS zoom affects BOTH rendering AND layout (unlike transform)
-                css_zoom_setup = f"""
-                    // Set html/body to full viewport for high-res rendering
-                    // Use flexbox centering to ensure content is ALWAYS centered in viewport
+                # INTEGER SCALING APPROACH: Render at native resolution, let FFmpeg handle upscaling
+                # This is the ONLY reliable way to handle non-responsive HTML5 ads
+                # We render at NATIVE size then use FFmpeg's high-quality scalers
+
+                self.log(f"=== RENDERING STRATEGY: NATIVE + FFMPEG UPSCALING ===")
+                self.log(f"HTML5 ads are designed with fixed pixels and are NOT responsive")
+                self.log(f"Best approach: Render at native {config.width}x{config.height}, upscale with FFmpeg")
+                self.log(f"FFmpeg will use high-quality lanczos scaler with sharpening")
+
+                # Simple CSS reset - don't try to scale or manipulate layout
+                simple_reset = f"""
+                    console.log('Setting up clean native rendering');
+
+                    // Minimal CSS reset for clean rendering at native resolution
                     document.documentElement.style.margin = '0';
                     document.documentElement.style.padding = '0';
-                    document.documentElement.style.width = '100%';
-                    document.documentElement.style.height = '100%';
                     document.documentElement.style.overflow = 'hidden';
-                    document.documentElement.style.background = '{bg_color_hex}';
 
                     document.body.style.margin = '0';
                     document.body.style.padding = '0';
-                    document.body.style.width = '100%';
-                    document.body.style.height = '100%';
                     document.body.style.overflow = 'hidden';
-                    document.body.style.background = '{bg_color_hex}';
-                    document.body.style.display = 'flex';
-                    document.body.style.alignItems = 'center';
-                    document.body.style.justifyContent = 'center';
 
-                    // Create container for exact target dimensions (this will be cropped to)
-                    var container = document.createElement('div');
-                    container.id = '__target_container__';
-                    container.style.position = 'relative';
-                    container.style.width = '{target_width}px';
-                    container.style.height = '{target_height}px';
-                    container.style.background = '{bg_color_hex}';
-                    container.style.overflow = 'hidden';
-                    container.style.display = 'flex';
-                    container.style.alignItems = 'center';
-                    container.style.justifyContent = 'center';
-
-                    // Create wrapper with CSS zoom (affects layout AND rendering)
-                    var wrapper = document.createElement('div');
-                    wrapper.id = '__hires_wrapper__';
-                    wrapper.style.width = '{config.width}px';
-                    wrapper.style.height = '{config.height}px';
-                    wrapper.style.zoom = '{scale}';  // CSS zoom affects layout calculations!
-
-                    // Move all body children into wrapper
-                    while (document.body.firstChild) {{
-                        wrapper.appendChild(document.body.firstChild);
-                    }}
-                    container.appendChild(wrapper);
-                    document.body.appendChild(container);
-
-                    // CRITICAL: Add professional CSS rules for bulletproof HD layout
-                    var styleOverrides = document.createElement('style');
-                    styleOverrides.id = '__text_fix__';
-                    styleOverrides.textContent = `
-                        /* Force all elements to use border-box sizing */
-                        #__hires_wrapper__ * {{
-                            box-sizing: border-box !important;
-                        }}
-
-                        /* FORCE wrapper to use flexbox column layout for proper spacing */
-                        #__hires_wrapper__ {{
-                            display: flex !important;
-                            flex-direction: column !important;
-                            align-items: center !important;
-                            justify-content: flex-start !important;
-                            gap: 3em !important;
-                            overflow: visible !important;
-                            padding: 2em 0 !important;
-                        }}
-
-                        /* PROFESSIONAL: Constrain width and allow proper text wrapping */
-                        #__hires_wrapper__ .cta,
-                        #__hires_wrapper__ .cta-label,
-                        #__hires_wrapper__ .button,
-                        #__hires_wrapper__ button,
-                        #__hires_wrapper__ a {{
-                            max-width: 90% !important;
-                            width: auto !important;
-                            margin-left: auto !important;
-                            margin-right: auto !important;
-                            word-break: break-word !important;
-                            overflow-wrap: break-word !important;
-                            hyphens: auto !important;
-                            text-align: center !important;
-                        }}
-
-                        /* MASSIVE line spacing to absolutely prevent overlap */
-                        #__hires_wrapper__ p,
-                        #__hires_wrapper__ h1,
-                        #__hires_wrapper__ h2,
-                        #__hires_wrapper__ h3,
-                        #__hires_wrapper__ h4,
-                        #__hires_wrapper__ h5,
-                        #__hires_wrapper__ h6,
-                        #__hires_wrapper__ div,
-                        #__hires_wrapper__ .text {{
-                            line-height: 1.6em !important;
-                        }}
-
-                        /* EXTREME vertical spacing between ALL direct children */
-                        #__hires_wrapper__ > * {{
-                            margin-top: 2.5em !important;
-                            margin-bottom: 2.5em !important;
-                            position: relative !important;
-                        }}
-
-                        /* Headers need even MORE space */
-                        #__hires_wrapper__ h1,
-                        #__hires_wrapper__ h2,
-                        #__hires_wrapper__ .header,
-                        #__hires_wrapper__ .main-header {{
-                            margin-top: 3em !important;
-                            margin-bottom: 3em !important;
-                            padding: 1em 0 !important;
-                        }}
-
-                        /* Ensure containers are properly sized and centered */
-                        #__hires_wrapper__ .text-container,
-                        #__hires_wrapper__ .content,
-                        #__hires_wrapper__ .container {{
-                            max-width: 100% !important;
-                            width: 100% !important;
-                            margin: 2em auto !important;
-                            position: relative !important;
-                        }}
-
-                        /* Flex centering for button/CTA containers */
-                        #__hires_wrapper__ .cta,
-                        #__hires_wrapper__ .button-container {{
-                            display: flex !important;
-                            flex-direction: column !important;
-                            align-items: center !important;
-                            justify-content: center !important;
-                            text-align: center !important;
-                        }}
-
-                        /* MASSIVE spacing for CTAs to prevent overlap */
-                        #__hires_wrapper__ .cta,
-                        #__hires_wrapper__ .button {{
-                            position: relative !important;
-                            z-index: 100 !important;
-                            padding: 2em 2.5em !important;
-                            margin: 4em auto !important;
-                        }}
-
-                        /* Add generous padding around ALL text elements */
-                        #__hires_wrapper__ p,
-                        #__hires_wrapper__ span {{
-                            padding: 1em 1.5em !important;
-                            margin: 1.5em auto !important;
-                        }}
-
-                        /* Special handling for CTA labels */
-                        #__hires_wrapper__ .cta-label {{
-                            padding: 1.5em 2em !important;
-                            margin: 3em auto !important;
-                        }}
-
-                        /* Force all absolutely positioned elements to relative */
-                        #__hires_wrapper__ [style*="position: absolute"],
-                        #__hires_wrapper__ [style*="position: fixed"] {{
-                            position: relative !important;
-                        }}
-
-                        /* Ensure proper document flow */
-                        #__hires_wrapper__ * {{
-                            clear: both !important;
-                        }}
-                    `;
-                    document.head.appendChild(styleOverrides);
-
-                    // CRITICAL: Scale canvas internal buffers for sharp rendering
-                    var canvases = wrapper.getElementsByTagName('canvas');
-                    for (var i = 0; i < canvases.length; i++) {{
-                        var canvas = canvases[i];
-                        var origW = canvas.width;
-                        var origH = canvas.height;
-
-                        // Scale internal buffer to high-res
-                        canvas.width = Math.floor(origW * {scale});
-                        canvas.height = Math.floor(origH * {scale});
-
-                        // CSS size will be handled by zoom
-                        if (!canvas.style.width) canvas.style.width = origW + 'px';
-                        if (!canvas.style.height) canvas.style.height = origH + 'px';
-
-                        console.log('Scaled canvas buffer:', origW + 'x' + origH, '→', canvas.width + 'x' + canvas.height);
-
-                        // Try to trigger redraw
-                        if (window.render) window.render();
-                        if (canvas.render) canvas.render();
-                    }}
-
-                    console.log('High-res rendering with CSS zoom complete: {target_width}x{target_height}');
+                    console.log('Clean native rendering setup complete');
                 """
-                driver.execute_script(css_zoom_setup)
-                self.log(f"Applied high-resolution CSS zoom (affects layout)")
+                driver.execute_script(simple_reset)
+                self.log(f"Rendering at native resolution {config.width}x{config.height}")
             else:
                 # No format change needed - use original dimensions
                 self.log(f"=== STANDARD RENDERING ===")
@@ -1021,7 +857,7 @@ class HTML5ToVideoConverter:
                     self.log(f"Capturing frame {frame_num + 1}/{total_frames}")
                 driver.save_screenshot(temp_screenshot)
 
-                # REQUIREMENT #6: Save frames at target resolution (high-res browser rendering)
+                # Save frames at HIGH-DPI resolution (browser rendered with device-scale-factor)
                 with Image.open(temp_screenshot) as img:
                     screenshot_w, screenshot_h = img.size
 
@@ -1029,50 +865,27 @@ class HTML5ToVideoConverter:
                     if frame_num == 0:
                         self.log(f"=== SCREENSHOT ANALYSIS ===")
                         self.log(f"Screenshot size: {screenshot_w}x{screenshot_h}")
-                        self.log(f"Target size: {target_width}x{target_height}")
-                        self.log(f"Width diff: {screenshot_w - target_width:+d}px")
-                        self.log(f"Height diff: {screenshot_h - target_height:+d}px")
+                        self.log(f"Expected size (native × device-scale): {int(config.width * device_scale)}x{int(config.height * device_scale)}")
 
-                        # Case 1: Larger - crop to target size from center
-                        if screenshot_w >= target_width and screenshot_h >= target_height:
-                            # Calculate center crop coordinates
-                            left = (screenshot_w - target_width) // 2
-                            top = (screenshot_h - target_height) // 2
-                            right = left + target_width
-                            bottom = top + target_height
+                        # With device-scale-factor, screenshot should be native size × scale factor
+                        # Example: 320x480 window with 3.375x scale = 1080x1620 screenshot
+                        expected_w = int(config.width * device_scale)
+                        expected_h = int(config.height * device_scale)
 
-                            self.log(f"Action: CENTER CROP ({screenshot_w}x{screenshot_h} → {target_width}x{target_height})")
-                            if left > 0 or top > 0:
-                                self.log(f"Crop offset: left={left}px, top={top}px")
-                            corrected = img.crop((left, top, right, bottom))
-                            corrected.save(frame_path)
-
-                        # Case 2: Smaller - resize to target
-                        elif screenshot_w < target_width or screenshot_h < target_height:
-                            self.log(f"Action: RESIZE with LANCZOS ({screenshot_w}x{screenshot_h} → {target_width}x{target_height})")
-                            self.log(f"WARNING: Screenshot smaller than expected!")
-                            corrected = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
-                            corrected.save(frame_path)
-
-                        # Case 3: Exact match
+                        if abs(screenshot_w - expected_w) < 10 and abs(screenshot_h - expected_h) < 10:
+                            self.log(f"Action: HIGH-DPI RENDERING SUCCESS!")
+                            self.log(f"Screenshot matches expected high-DPI size")
+                            self.log(f"FFmpeg will handle padding to {target_width}x{target_height}")
+                            # Save as-is, FFmpeg will handle padding
+                            img.save(frame_path)
                         else:
-                            self.log(f"Action: EXACT MATCH - frames at target resolution!")
+                            self.log(f"WARNING: Screenshot size mismatch")
+                            self.log(f"Expected: {expected_w}x{expected_h}, Got: {screenshot_w}x{screenshot_h}")
+                            # Save anyway, FFmpeg will handle it
                             img.save(frame_path)
                     else:
-                        # For subsequent frames, just do the correction without logging
-                        if screenshot_w >= target_width and screenshot_h >= target_height:
-                            # Center crop for subsequent frames too
-                            left = (screenshot_w - target_width) // 2
-                            top = (screenshot_h - target_height) // 2
-                            right = left + target_width
-                            bottom = top + target_height
-                            corrected = img.crop((left, top, right, bottom))
-                            corrected.save(frame_path)
-                        elif screenshot_w < target_width or screenshot_h < target_height:
-                            corrected = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
-                            corrected.save(frame_path)
-                        else:
-                            img.save(frame_path)
+                        # For subsequent frames, just save as-is
+                        img.save(frame_path)
 
                     # REQUIREMENT #7: Output debug frame 'frame_fixed.png'
                     if frame_num == 0:
@@ -1082,11 +895,8 @@ class HTML5ToVideoConverter:
                             final_w, final_h = fixed_img.size
                             self.log(f"=== DEBUG FRAME OUTPUT ===")
                             self.log(f"Saved: frame_fixed.png")
-                            self.log(f"Final dimensions: {final_w}x{final_h}")
-                            match = "YES" if final_w == target_width and final_h == target_height else "NO"
-                            self.log(f"Dimensions match target: {match}")
-                            if match == "NO":
-                                self.log(f"ERROR: Expected {target_width}x{target_height}, got {final_w}x{final_h}")
+                            self.log(f"Frame dimensions: {final_w}x{final_h}")
+                            self.log(f"FFmpeg will scale and pad to: {target_width}x{target_height}")
 
                 os.unlink(temp_screenshot)
 
@@ -1113,8 +923,22 @@ class HTML5ToVideoConverter:
                 self.log("Failed to close browser")
             return None, None
 
-        # No padding needed - frames are already at target resolution
-        return frames_dir, None
+        # Return padding info for FFmpeg to handle final scaling and padding
+        if needs_format_change:
+            padding_info = {
+                'source_width': int(config.width * device_scale),
+                'source_height': int(config.height * device_scale),
+                'target_width': target_width,
+                'target_height': target_height,
+                'bg_color': bg_color_hex
+            }
+            self.log(f"=== PADDING INFO FOR FFMPEG ===")
+            self.log(f"Source (high-DPI frames): {padding_info['source_width']}x{padding_info['source_height']}")
+            self.log(f"Target (final video): {padding_info['target_width']}x{padding_info['target_height']}")
+            self.log(f"Background color: {padding_info['bg_color']}")
+            return frames_dir, padding_info
+        else:
+            return frames_dir, None
 
     def encode_video(self, frames_dir: str, output_path: str, config: VideoConfig, padding_info: dict = None) -> bool:
         """Encode frames to video using FFmpeg
