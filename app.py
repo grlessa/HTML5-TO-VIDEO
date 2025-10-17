@@ -1632,56 +1632,47 @@ def main():
 
                 shutil.rmtree(temp_extract)
 
-            # Unified auto-detect UI with optional overrides
-            st.write("**Auto-detected settings:**")
-
             # Use auto-detected values by default
             width = detected_width
             height = detected_height
             fps = detected_fps
 
-            # Show detected values (read-only)
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Resolution", f"{width}x{height}", help="Auto-detected from HTML5 content")
-            with col2:
-                st.metric("FPS", fps, help="Auto-detected from animations")
-            with col3:
-                st.metric("Quality", "High", help="Optimized encoding settings")
+            # Compact settings display
+            with st.expander("⚙️ Settings", expanded=True):
+                # Show detected values
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Resolution", f"{width}x{height}")
+                with col2:
+                    st.metric("FPS", fps)
+                with col3:
+                    st.metric("Quality", "High")
 
-            # Duration control with checkbox
-            st.markdown("**Duration**")
-            col1, col2 = st.columns([1, 4])
-            with col1:
-                use_custom_duration = st.checkbox("Custom", value=False, key="custom_duration", help="Override auto-detected duration")
-            with col2:
-                if use_custom_duration:
-                    duration = st.number_input("Duration (seconds)", 1, 300, detected_duration, key="duration_input")
-                else:
-                    duration = detected_duration
-                    st.number_input("Duration (seconds)", 1, 300, duration, disabled=True, key="duration_input")
+                # Compact controls
+                col1, col2 = st.columns(2)
 
-            # Output format control with checkbox
-            st.markdown("**Output Format**")
-            from app import FormatCSS
-            auto_output_width, auto_output_height, auto_format_name = FormatCSS.detect_best_format(width, height)
+                with col1:
+                    use_custom_duration = st.checkbox("Custom duration", value=False, key="custom_duration")
+                    if use_custom_duration:
+                        duration = st.number_input("Seconds", 1, 300, detected_duration, key="duration_input")
+                    else:
+                        duration = detected_duration
 
-            use_auto_format = st.checkbox("Auto-detect format", value=True, key="auto_format", help="Automatically choose between Square and Vertical based on aspect ratio")
+                with col2:
+                    from app import FormatCSS
+                    auto_output_width, auto_output_height, auto_format_name = FormatCSS.detect_best_format(width, height)
 
-            if use_auto_format:
-                st.info(f"📐 Auto-detected: **{auto_format_name}** ({auto_output_width}x{auto_output_height})")
-                target_format = "auto"
-            else:
-                format_option = st.selectbox(
-                    "Choose output format",
-                    ["1080x1080 (Square/Instagram)", "1080x1920 (Vertical/Stories)"],
-                    key="format_select"
-                )
-                # Map selection to target_format value
-                if "1080x1080" in format_option:
-                    target_format = "square"
-                else:
-                    target_format = "vertical"
+                    use_auto_format = st.checkbox("Auto format", value=True, key="auto_format")
+                    if not use_auto_format:
+                        format_option = st.selectbox(
+                            "Format",
+                            ["1080x1080 (Square)", "1080x1920 (Vertical)"],
+                            key="format_select"
+                        )
+                        target_format = "square" if "Square" in format_option else "vertical"
+                    else:
+                        st.caption(auto_format_name)
+                        target_format = "auto"
 
             # Use optimal settings for high quality
             codec = "libx264"
