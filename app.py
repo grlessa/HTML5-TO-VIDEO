@@ -415,16 +415,27 @@ class HTML5ToVideoConverter:
         self.log(f"Total frames: {total_frames} ({config.fps} FPS × {config.duration}s)")
         self.log(f"Frame time: {frame_time_s:.4f}s per frame")
 
-        # Calculate scale factor BEFORE browser setup
+        # Calculate PROPORTIONAL scale factor BEFORE browser setup
         scale_factor_w = target_width / config.width
         scale_factor_h = target_height / config.height
-        scale_factor = min(scale_factor_w, scale_factor_h)  # Use min to fit within target
+        scale_factor = min(scale_factor_w, scale_factor_h)  # Use min to fit within target (PROPORTIONAL)
         needs_format_change = (target_width != config.width or target_height != config.height)
 
-        self.log(f"Scale factor: {scale_factor:.2f}x (w:{scale_factor_w:.2f}x, h:{scale_factor_h:.2f}x)")
+        # Calculate actual scaled dimensions (maintaining aspect ratio)
+        scaled_width = int(config.width * scale_factor)
+        scaled_height = int(config.height * scale_factor)
+
+        # Calculate padding needed to center in target frame
+        pad_x = (target_width - scaled_width) // 2
+        pad_y = (target_height - scaled_height) // 2
+
+        self.log(f"Scale factor: {scale_factor:.2f}x (PROPORTIONAL - maintains aspect ratio)")
+        self.log(f"Source: {config.width}x{config.height} → Scaled: {scaled_width}x{scaled_height}")
+        self.log(f"Target frame: {target_width}x{target_height}")
+        self.log(f"Padding: {pad_x}px horizontal, {pad_y}px vertical")
         self.log(f"Format change needed: {needs_format_change}")
 
-        # Chrome options - REQUIREMENT #1: Set window size in chrome_options
+        # Chrome options - REQUIREMENT #1: Set window size to TARGET with buffer for centering
         self.log(f"=== BROWSER INITIALIZATION ===")
         chrome_options = Options()
         chrome_options.add_argument('--headless=new')
@@ -434,17 +445,13 @@ class HTML5ToVideoConverter:
         chrome_options.add_argument('--hide-scrollbars')
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
 
-        # Set window to NATIVE resolution (source dimensions)
-        # Use device-scale-factor for high-DPI rendering without breaking layout
-        window_size = f'{config.width},{config.height}'
+        # Set window to TARGET resolution (where we'll render centered content)
+        # We'll use CSS transform to scale content proportionally and center it
+        window_size = f'{target_width},{target_height}'
         chrome_options.add_argument(f'--window-size={window_size}')
-
-        # CRITICAL: Use high device scale factor for crisp rendering
-        # This makes the browser render at high DPI while keeping layout at native size
-        device_scale = scale_factor
-        chrome_options.add_argument(f'--force-device-scale-factor={device_scale}')
-        self.log(f"Chrome --window-size: {window_size} (native: {config.width}x{config.height})")
-        self.log(f"Chrome --force-device-scale-factor: {device_scale} (for high-DPI rendering)")
+        chrome_options.add_argument('--force-device-scale-factor=1')  # No device scaling, we handle it with CSS
+        self.log(f"Chrome --window-size: {window_size} (target frame)")
+        self.log(f"Will use CSS transform for proportional scaling")
 
         # Find browser binary
         browser_paths = [
@@ -481,10 +488,10 @@ class HTML5ToVideoConverter:
             return None
 
         try:
-            # Set window to NATIVE resolution via Selenium
+            # Set window to TARGET resolution via Selenium
             self.log(f"=== PAGE LOADING ===")
-            driver.set_window_size(config.width, config.height)
-            self.log(f"Selenium set_window_size called: {config.width}x{config.height} (native)")
+            driver.set_window_size(target_width, target_height)
+            self.log(f"Selenium set_window_size called: {target_width}x{target_height} (target frame)")
 
             # Load HTML
             file_url = f"file://{html_path}"
@@ -547,31 +554,61 @@ class HTML5ToVideoConverter:
                     self.log(f"Could not detect background color, using black: {e}")
                     bg_color_hex = "#000000"
 
-                # Log high-DPI rendering strategy
-                self.log(f"=== HIGH-DPI RENDERING STRATEGY ===")
-                self.log(f"Browser viewport: {config.width}x{config.height} (NATIVE)")
-                self.log(f"Device scale factor: {scale_factor:.3f}x")
-                self.log(f"Expected screenshot size: {int(config.width * scale_factor)}x{int(config.height * scale_factor)}")
-                self.log(f"FFmpeg will pad to: {target_width}x{target_height}")
-                self.log(f"Background color for padding: {bg_color_hex}")
+                # Log proportional scaling strategy
+                self.log(f"=== PROPORTIONAL SCALING STRATEGY ===")
+                self.log(f"Browser viewport: {target_width}x{target_height} (target frame)")
+                self.log(f"Source content: {config.width}x{config.height}")
+                self.log(f"Proportional scale: {scale_factor:.3f}x (uniform)")
+                self.log(f"Scaled content: {scaled_width}x{scaled_height}")
+                self.log(f"Centering with padding: {pad_x}px H, {pad_y}px V")
+                self.log(f"Background color: {bg_color_hex}")
 
-                # Simple CSS reset - don't try to scale or manipulate layout
-                simple_reset = f"""
-                    console.log('Setting up clean native rendering');
+                # PROPORTIONAL CSS transform scaling with centering
+                proportional_scaling = f"""
+                    console.log('Setting up PROPORTIONAL scaling with centering');
 
-                    // Minimal CSS reset for clean rendering at native resolution
+                    // Set viewport to target frame size with background
                     document.documentElement.style.margin = '0';
                     document.documentElement.style.padding = '0';
+                    document.documentElement.style.width = '{target_width}px';
+                    document.documentElement.style.height = '{target_height}px';
                     document.documentElement.style.overflow = 'hidden';
+                    document.documentElement.style.background = '{bg_color_hex}';
 
+                    // Body fills viewport with flexbox centering
                     document.body.style.margin = '0';
                     document.body.style.padding = '0';
+                    document.body.style.width = '{target_width}px';
+                    document.body.style.height = '{target_height}px';
                     document.body.style.overflow = 'hidden';
+                    document.body.style.background = '{bg_color_hex}';
+                    document.body.style.display = 'flex';
+                    document.body.style.alignItems = 'center';
+                    document.body.style.justifyContent = 'center';
 
-                    console.log('Clean native rendering setup complete');
+                    // Create wrapper at NATIVE size for content
+                    var wrapper = document.createElement('div');
+                    wrapper.id = '__content_wrapper__';
+                    wrapper.style.width = '{config.width}px';
+                    wrapper.style.height = '{config.height}px';
+                    wrapper.style.position = 'relative';
+
+                    // CRITICAL: Proportional scaling with transform (uniform scale!)
+                    wrapper.style.transform = 'scale({scale_factor})';
+                    wrapper.style.transformOrigin = 'center center';
+
+                    // Move all body children into wrapper
+                    while (document.body.firstChild) {{
+                        wrapper.appendChild(document.body.firstChild);
+                    }}
+                    document.body.appendChild(wrapper);
+
+                    console.log('Proportional scaling setup complete');
+                    console.log('Scale factor: {scale_factor} (uniform - no stretching)');
+                    console.log('Wrapper: {config.width}x{config.height} → {scaled_width}x{scaled_height}');
                 """
-                driver.execute_script(simple_reset)
-                self.log(f"Rendering at native resolution {config.width}x{config.height}")
+                driver.execute_script(proportional_scaling)
+                self.log(f"Applied PROPORTIONAL transform scaling (no stretching)")
             else:
                 # No format change needed - use original dimensions
                 self.log(f"=== STANDARD RENDERING ===")
@@ -838,7 +875,7 @@ class HTML5ToVideoConverter:
                     self.log(f"Capturing frame {frame_num + 1}/{total_frames}")
                 driver.save_screenshot(temp_screenshot)
 
-                # Save frames at HIGH-DPI resolution (browser rendered with device-scale-factor)
+                # Save frames at TARGET resolution (proportionally scaled and centered)
                 with Image.open(temp_screenshot) as img:
                     screenshot_w, screenshot_h = img.size
 
@@ -846,24 +883,23 @@ class HTML5ToVideoConverter:
                     if frame_num == 0:
                         self.log(f"=== SCREENSHOT ANALYSIS ===")
                         self.log(f"Screenshot size: {screenshot_w}x{screenshot_h}")
-                        self.log(f"Expected size (native × device-scale): {int(config.width * device_scale)}x{int(config.height * device_scale)}")
+                        self.log(f"Expected size (target frame): {target_width}x{target_height}")
 
-                        # With device-scale-factor, screenshot should be native size × scale factor
-                        # Example: 320x480 window with 3.375x scale = 1080x1620 screenshot
-                        expected_w = int(config.width * device_scale)
-                        expected_h = int(config.height * device_scale)
-
-                        if abs(screenshot_w - expected_w) < 10 and abs(screenshot_h - expected_h) < 10:
-                            self.log(f"Action: HIGH-DPI RENDERING SUCCESS!")
-                            self.log(f"Screenshot matches expected high-DPI size")
-                            self.log(f"FFmpeg will handle padding to {target_width}x{target_height}")
-                            # Save as-is, FFmpeg will handle padding
+                        if abs(screenshot_w - target_width) < 10 and abs(screenshot_h - target_height) < 10:
+                            self.log(f"Action: PROPORTIONAL SCALING SUCCESS!")
+                            self.log(f"Screenshot matches target frame")
+                            self.log(f"Content is scaled {scale_factor:.2f}x and centered")
+                            # Save as-is, already at target dimensions with padding
                             img.save(frame_path)
                         else:
                             self.log(f"WARNING: Screenshot size mismatch")
-                            self.log(f"Expected: {expected_w}x{expected_h}, Got: {screenshot_w}x{screenshot_h}")
-                            # Save anyway, FFmpeg will handle it
-                            img.save(frame_path)
+                            self.log(f"Expected: {target_width}x{target_height}, Got: {screenshot_w}x{screenshot_h}")
+                            # Resize to target if needed
+                            if screenshot_w != target_width or screenshot_h != target_height:
+                                resized = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+                                resized.save(frame_path)
+                            else:
+                                img.save(frame_path)
                     else:
                         # For subsequent frames, just save as-is
                         img.save(frame_path)
@@ -877,7 +913,8 @@ class HTML5ToVideoConverter:
                             self.log(f"=== DEBUG FRAME OUTPUT ===")
                             self.log(f"Saved: frame_fixed.png")
                             self.log(f"Frame dimensions: {final_w}x{final_h}")
-                            self.log(f"FFmpeg will scale and pad to: {target_width}x{target_height}")
+                            self.log(f"Content: {config.width}x{config.height} scaled {scale_factor:.2f}x = {scaled_width}x{scaled_height}")
+                            self.log(f"Padding: {pad_x}px H, {pad_y}px V (background: {bg_color_hex})")
 
                 os.unlink(temp_screenshot)
 
@@ -904,22 +941,13 @@ class HTML5ToVideoConverter:
                 self.log("Failed to close browser")
             return None, None
 
-        # Return padding info for FFmpeg to handle final scaling and padding
-        if needs_format_change:
-            padding_info = {
-                'source_width': int(config.width * device_scale),
-                'source_height': int(config.height * device_scale),
-                'target_width': target_width,
-                'target_height': target_height,
-                'bg_color': bg_color_hex
-            }
-            self.log(f"=== PADDING INFO FOR FFMPEG ===")
-            self.log(f"Source (high-DPI frames): {padding_info['source_width']}x{padding_info['source_height']}")
-            self.log(f"Target (final video): {padding_info['target_width']}x{padding_info['target_height']}")
-            self.log(f"Background color: {padding_info['bg_color']}")
-            return frames_dir, padding_info
-        else:
-            return frames_dir, None
+        # Frames are already at target dimensions with proportional scaling and padding
+        # No additional FFmpeg processing needed
+        self.log(f"=== FRAME RENDERING COMPLETE ===")
+        self.log(f"Frames ready at target dimensions: {target_width}x{target_height}")
+        self.log(f"Proportional scaling applied: {scale_factor:.2f}x (no stretching)")
+        self.log(f"No FFmpeg padding needed - frames are ready for encoding")
+        return frames_dir, None
 
     def encode_video(self, frames_dir: str, output_path: str, config: VideoConfig, padding_info: dict = None) -> bool:
         """Encode frames to video using FFmpeg
