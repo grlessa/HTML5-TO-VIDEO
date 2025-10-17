@@ -608,7 +608,7 @@ class HTML5ToVideoConverter:
                     container.appendChild(wrapper);
                     document.body.appendChild(container);
 
-                    // CRITICAL: Add aggressive CSS rules to fix layout issues at HD
+                    // CRITICAL: Add professional CSS rules for bulletproof HD layout
                     var styleOverrides = document.createElement('style');
                     styleOverrides.id = '__text_fix__';
                     styleOverrides.textContent = `
@@ -617,19 +617,23 @@ class HTML5ToVideoConverter:
                             box-sizing: border-box !important;
                         }}
 
-                        /* AGGRESSIVE: Force all text elements to no-wrap by default */
-                        #__hires_wrapper__ span,
+                        /* PROFESSIONAL: Constrain width and allow proper text wrapping */
                         #__hires_wrapper__ .cta,
                         #__hires_wrapper__ .cta-label,
                         #__hires_wrapper__ .button,
                         #__hires_wrapper__ button,
                         #__hires_wrapper__ a {{
-                            white-space: nowrap !important;
-                            overflow: visible !important;
-                            text-overflow: clip !important;
+                            max-width: 90% !important;
+                            width: 100% !important;
+                            margin-left: auto !important;
+                            margin-right: auto !important;
+                            word-break: break-word !important;
+                            overflow-wrap: break-word !important;
+                            hyphens: auto !important;
+                            text-align: center !important;
                         }}
 
-                        /* Ensure generous line spacing to prevent overlap */
+                        /* Generous line spacing to prevent overlap */
                         #__hires_wrapper__ p,
                         #__hires_wrapper__ h1,
                         #__hires_wrapper__ h2,
@@ -639,47 +643,60 @@ class HTML5ToVideoConverter:
                         #__hires_wrapper__ h6,
                         #__hires_wrapper__ div,
                         #__hires_wrapper__ .text {{
-                            line-height: 1.4em !important;
+                            line-height: 1.5em !important;
                         }}
 
-                        /* Add vertical spacing between sections */
+                        /* CRITICAL: Generous vertical spacing between ALL sections */
                         #__hires_wrapper__ > * {{
-                            margin-bottom: 2em !important;
+                            margin-top: 1.5em !important;
+                            margin-bottom: 1.5em !important;
                         }}
 
-                        /* Prevent containers from being too narrow */
+                        /* Ensure containers are properly sized and centered */
                         #__hires_wrapper__ .text-container,
                         #__hires_wrapper__ .content,
                         #__hires_wrapper__ .container {{
-                            min-width: 100% !important;
+                            max-width: 100% !important;
                             width: 100% !important;
+                            margin: 0 auto !important;
                         }}
 
                         /* Flex centering for button/CTA containers */
                         #__hires_wrapper__ .cta,
                         #__hires_wrapper__ .button-container {{
                             display: flex !important;
+                            flex-direction: column !important;
                             align-items: center !important;
                             justify-content: center !important;
                             text-align: center !important;
                         }}
 
-                        /* Ensure proper z-index stacking */
+                        /* Ensure proper z-index stacking with generous spacing */
                         #__hires_wrapper__ .cta,
                         #__hires_wrapper__ .button {{
                             position: relative !important;
-                            z-index: 10 !important;
+                            z-index: 100 !important;
+                            padding: 1em 1.5em !important;
+                            margin: 2em auto !important;
                         }}
 
-                        /* Add generous padding around text elements */
+                        /* Add generous padding around ALL text elements */
                         #__hires_wrapper__ p,
+                        #__hires_wrapper__ span,
                         #__hires_wrapper__ .cta-label {{
-                            padding: 0.5em 1em !important;
+                            padding: 0.75em 1.25em !important;
+                            margin: 0.5em auto !important;
                         }}
 
-                        /* Prevent absolutely positioned elements from overlapping */
-                        #__hires_wrapper__ [style*="position: absolute"] {{
-                            transform: none !important;
+                        /* Prevent overflow by forcing proper containment */
+                        #__hires_wrapper__ {{
+                            overflow: hidden !important;
+                        }}
+
+                        /* Reset any transforms that might cause positioning issues */
+                        #__hires_wrapper__ [style*="position: absolute"],
+                        #__hires_wrapper__ [style*="position: fixed"] {{
+                            position: relative !important;
                         }}
                     `;
                     document.head.appendChild(styleOverrides);
