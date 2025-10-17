@@ -608,6 +608,42 @@ class HTML5ToVideoConverter:
                     container.appendChild(wrapper);
                     document.body.appendChild(container);
 
+                    // CRITICAL: Add CSS rules to fix text wrapping issues
+                    var styleOverrides = document.createElement('style');
+                    styleOverrides.id = '__text_fix__';
+                    styleOverrides.textContent = `
+                        /* Ensure text containers have proper width */
+                        #__hires_wrapper__ * {{
+                            box-sizing: border-box !important;
+                        }}
+
+                        /* Fix button/CTA text wrapping */
+                        #__hires_wrapper__ .cta,
+                        #__hires_wrapper__ .cta-label,
+                        #__hires_wrapper__ .button,
+                        #__hires_wrapper__ button {{
+                            white-space: nowrap !important;
+                            overflow: visible !important;
+                            text-overflow: clip !important;
+                        }}
+
+                        /* Ensure proper line spacing */
+                        #__hires_wrapper__ p,
+                        #__hires_wrapper__ h1,
+                        #__hires_wrapper__ h2,
+                        #__hires_wrapper__ h3,
+                        #__hires_wrapper__ .text {{
+                            line-height: 1.3em !important;
+                        }}
+
+                        /* Prevent text containers from being too narrow */
+                        #__hires_wrapper__ .text-container,
+                        #__hires_wrapper__ .content {{
+                            min-width: 100% !important;
+                        }}
+                    `;
+                    document.head.appendChild(styleOverrides);
+
                     // CRITICAL: Scale canvas internal buffers for sharp rendering
                     var canvases = wrapper.getElementsByTagName('canvas');
                     for (var i = 0; i < canvases.length; i++) {{
