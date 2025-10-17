@@ -617,6 +617,17 @@ class HTML5ToVideoConverter:
                             box-sizing: border-box !important;
                         }}
 
+                        /* FORCE wrapper to use flexbox column layout for proper spacing */
+                        #__hires_wrapper__ {{
+                            display: flex !important;
+                            flex-direction: column !important;
+                            align-items: center !important;
+                            justify-content: flex-start !important;
+                            gap: 3em !important;
+                            overflow: visible !important;
+                            padding: 2em 0 !important;
+                        }}
+
                         /* PROFESSIONAL: Constrain width and allow proper text wrapping */
                         #__hires_wrapper__ .cta,
                         #__hires_wrapper__ .cta-label,
@@ -624,7 +635,7 @@ class HTML5ToVideoConverter:
                         #__hires_wrapper__ button,
                         #__hires_wrapper__ a {{
                             max-width: 90% !important;
-                            width: 100% !important;
+                            width: auto !important;
                             margin-left: auto !important;
                             margin-right: auto !important;
                             word-break: break-word !important;
@@ -633,7 +644,7 @@ class HTML5ToVideoConverter:
                             text-align: center !important;
                         }}
 
-                        /* Generous line spacing to prevent overlap */
+                        /* MASSIVE line spacing to absolutely prevent overlap */
                         #__hires_wrapper__ p,
                         #__hires_wrapper__ h1,
                         #__hires_wrapper__ h2,
@@ -643,13 +654,24 @@ class HTML5ToVideoConverter:
                         #__hires_wrapper__ h6,
                         #__hires_wrapper__ div,
                         #__hires_wrapper__ .text {{
-                            line-height: 1.5em !important;
+                            line-height: 1.6em !important;
                         }}
 
-                        /* CRITICAL: Generous vertical spacing between ALL sections */
+                        /* EXTREME vertical spacing between ALL direct children */
                         #__hires_wrapper__ > * {{
-                            margin-top: 1.5em !important;
-                            margin-bottom: 1.5em !important;
+                            margin-top: 2.5em !important;
+                            margin-bottom: 2.5em !important;
+                            position: relative !important;
+                        }}
+
+                        /* Headers need even MORE space */
+                        #__hires_wrapper__ h1,
+                        #__hires_wrapper__ h2,
+                        #__hires_wrapper__ .header,
+                        #__hires_wrapper__ .main-header {{
+                            margin-top: 3em !important;
+                            margin-bottom: 3em !important;
+                            padding: 1em 0 !important;
                         }}
 
                         /* Ensure containers are properly sized and centered */
@@ -658,7 +680,8 @@ class HTML5ToVideoConverter:
                         #__hires_wrapper__ .container {{
                             max-width: 100% !important;
                             width: 100% !important;
-                            margin: 0 auto !important;
+                            margin: 2em auto !important;
+                            position: relative !important;
                         }}
 
                         /* Flex centering for button/CTA containers */
@@ -671,32 +694,37 @@ class HTML5ToVideoConverter:
                             text-align: center !important;
                         }}
 
-                        /* Ensure proper z-index stacking with generous spacing */
+                        /* MASSIVE spacing for CTAs to prevent overlap */
                         #__hires_wrapper__ .cta,
                         #__hires_wrapper__ .button {{
                             position: relative !important;
                             z-index: 100 !important;
-                            padding: 1em 1.5em !important;
-                            margin: 2em auto !important;
+                            padding: 2em 2.5em !important;
+                            margin: 4em auto !important;
                         }}
 
                         /* Add generous padding around ALL text elements */
                         #__hires_wrapper__ p,
-                        #__hires_wrapper__ span,
+                        #__hires_wrapper__ span {{
+                            padding: 1em 1.5em !important;
+                            margin: 1.5em auto !important;
+                        }}
+
+                        /* Special handling for CTA labels */
                         #__hires_wrapper__ .cta-label {{
-                            padding: 0.75em 1.25em !important;
-                            margin: 0.5em auto !important;
+                            padding: 1.5em 2em !important;
+                            margin: 3em auto !important;
                         }}
 
-                        /* Prevent overflow by forcing proper containment */
-                        #__hires_wrapper__ {{
-                            overflow: hidden !important;
-                        }}
-
-                        /* Reset any transforms that might cause positioning issues */
+                        /* Force all absolutely positioned elements to relative */
                         #__hires_wrapper__ [style*="position: absolute"],
                         #__hires_wrapper__ [style*="position: fixed"] {{
                             position: relative !important;
+                        }}
+
+                        /* Ensure proper document flow */
+                        #__hires_wrapper__ * {{
+                            clear: both !important;
                         }}
                     `;
                     document.head.appendChild(styleOverrides);
