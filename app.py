@@ -608,38 +608,78 @@ class HTML5ToVideoConverter:
                     container.appendChild(wrapper);
                     document.body.appendChild(container);
 
-                    // CRITICAL: Add CSS rules to fix text wrapping issues
+                    // CRITICAL: Add aggressive CSS rules to fix layout issues at HD
                     var styleOverrides = document.createElement('style');
                     styleOverrides.id = '__text_fix__';
                     styleOverrides.textContent = `
-                        /* Ensure text containers have proper width */
+                        /* Force all elements to use border-box sizing */
                         #__hires_wrapper__ * {{
                             box-sizing: border-box !important;
                         }}
 
-                        /* Fix button/CTA text wrapping */
+                        /* AGGRESSIVE: Force all text elements to no-wrap by default */
+                        #__hires_wrapper__ span,
                         #__hires_wrapper__ .cta,
                         #__hires_wrapper__ .cta-label,
                         #__hires_wrapper__ .button,
-                        #__hires_wrapper__ button {{
+                        #__hires_wrapper__ button,
+                        #__hires_wrapper__ a {{
                             white-space: nowrap !important;
                             overflow: visible !important;
                             text-overflow: clip !important;
                         }}
 
-                        /* Ensure proper line spacing */
+                        /* Ensure generous line spacing to prevent overlap */
                         #__hires_wrapper__ p,
                         #__hires_wrapper__ h1,
                         #__hires_wrapper__ h2,
                         #__hires_wrapper__ h3,
+                        #__hires_wrapper__ h4,
+                        #__hires_wrapper__ h5,
+                        #__hires_wrapper__ h6,
+                        #__hires_wrapper__ div,
                         #__hires_wrapper__ .text {{
-                            line-height: 1.3em !important;
+                            line-height: 1.4em !important;
                         }}
 
-                        /* Prevent text containers from being too narrow */
+                        /* Add vertical spacing between sections */
+                        #__hires_wrapper__ > * {{
+                            margin-bottom: 2em !important;
+                        }}
+
+                        /* Prevent containers from being too narrow */
                         #__hires_wrapper__ .text-container,
-                        #__hires_wrapper__ .content {{
+                        #__hires_wrapper__ .content,
+                        #__hires_wrapper__ .container {{
                             min-width: 100% !important;
+                            width: 100% !important;
+                        }}
+
+                        /* Flex centering for button/CTA containers */
+                        #__hires_wrapper__ .cta,
+                        #__hires_wrapper__ .button-container {{
+                            display: flex !important;
+                            align-items: center !important;
+                            justify-content: center !important;
+                            text-align: center !important;
+                        }}
+
+                        /* Ensure proper z-index stacking */
+                        #__hires_wrapper__ .cta,
+                        #__hires_wrapper__ .button {{
+                            position: relative !important;
+                            z-index: 10 !important;
+                        }}
+
+                        /* Add generous padding around text elements */
+                        #__hires_wrapper__ p,
+                        #__hires_wrapper__ .cta-label {{
+                            padding: 0.5em 1em !important;
+                        }}
+
+                        /* Prevent absolutely positioned elements from overlapping */
+                        #__hires_wrapper__ [style*="position: absolute"] {{
+                            transform: none !important;
                         }}
                     `;
                     document.head.appendChild(styleOverrides);
