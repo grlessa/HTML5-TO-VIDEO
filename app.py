@@ -425,12 +425,12 @@ class HTML5ToVideoConverter:
         chrome_options.add_argument('--hide-scrollbars')
         chrome_options.add_argument('--force-device-scale-factor=1')
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-        # Set window to NATIVE HTML5 size (not target format size)
-        # Add extra height for browser chrome in headless mode
-        height_buffer = max(150, int(config.height * 0.3))  # At least 150px or 30% of height
-        window_size = f'{config.width},{config.height + height_buffer}'
+        # Set window to TARGET resolution for sharp rendering
+        # Browser will render at high-res, then we'll scale content with CSS
+        height_buffer = max(150, int(target_height * 0.3))  # At least 150px or 30% of height
+        window_size = f'{target_width},{target_height + height_buffer}'
         chrome_options.add_argument(f'--window-size={window_size}')
-        self.log(f"Chrome --window-size: {window_size} (native: {config.width}x{config.height}, buffer: {height_buffer}px)")
+        self.log(f"Chrome --window-size: {window_size} (target: {target_width}x{target_height}, buffer: {height_buffer}px)")
 
         # Find browser binary
         browser_paths = [
@@ -467,10 +467,10 @@ class HTML5ToVideoConverter:
             return None
 
         try:
-            # Set window to NATIVE size via Selenium (in addition to chrome_options)
+            # Set window to TARGET resolution via Selenium (in addition to chrome_options)
             self.log(f"=== PAGE LOADING ===")
-            driver.set_window_size(config.width, config.height + height_buffer)
-            self.log(f"Selenium set_window_size called: {config.width}x{config.height + height_buffer}")
+            driver.set_window_size(target_width, target_height + height_buffer)
+            self.log(f"Selenium set_window_size called: {target_width}x{target_height + height_buffer}")
 
             # Load HTML
             file_url = f"file://{html_path}"
@@ -487,11 +487,10 @@ class HTML5ToVideoConverter:
             self.log(f"Scale factor: {scale_factor:.2f}x (w:{scale_factor_w:.2f}x, h:{scale_factor_h:.2f}x)")
             self.log(f"Format change needed: {needs_format_change}")
 
-            # Extract background color for FFmpeg padding (if format change needed)
-            padding_info = None  # Will be set if format change is needed
+            # Extract background color and apply CSS scaling for high-res rendering
             bg_color_hex = "#000000"  # default
             if needs_format_change:
-                self.log(f"=== DETECTING BACKGROUND COLOR FOR PADDING ===")
+                self.log(f"=== HIGH-RESOLUTION RENDERING SETUP ===")
                 self.log(f"Target format: {format_name}")
 
                 # Extract predominant background color from page
@@ -543,53 +542,96 @@ class HTML5ToVideoConverter:
                     self.log(f"Could not detect background color, using black: {e}")
                     bg_color_hex = "#000000"
 
-                self.log(f"Will use FFmpeg padding with color: {bg_color_hex}")
-                self.log(f"Content will be rendered at native size: {config.width}x{config.height}")
-                self.log(f"FFmpeg will pad to target size: {target_width}x{target_height}")
+                # Calculate scaling for high-res rendering
+                scale_x = target_width / config.width
+                scale_y = target_height / config.height
+                scale = min(scale_x, scale_y)  # fit to viewport
 
-                # Store padding info for FFmpeg
-                padding_info = {
-                    'bg_color': bg_color_hex,
-                    'source_width': config.width,
-                    'source_height': config.height,
-                    'target_width': target_width,
-                    'target_height': target_height
-                }
+                scaled_width = int(config.width * scale)
+                scaled_height = int(config.height * scale)
 
-            # REQUIREMENT #3: Set viewport to NATIVE dimensions (no browser scaling)
-            # Render at original HTML5 size for perfect fidelity
-            self.log(f"=== SETTING VIEWPORT TO NATIVE SIZE ===")
-            native_width = config.width
-            native_height = config.height
+                offset_x = (target_width - scaled_width) // 2
+                offset_y = (target_height - scaled_height) // 2
 
-            js_resize = f"""
-                document.documentElement.style.margin = '0';
-                document.documentElement.style.padding = '0';
-                document.documentElement.style.overflow = 'hidden';
-                document.documentElement.style.width = '{native_width}px';
-                document.documentElement.style.height = '{native_height}px';
+                self.log(f"Browser viewport: {target_width}x{target_height} (HIGH-RES)")
+                self.log(f"HTML5 native: {config.width}x{config.height}")
+                self.log(f"Scale factor: {scale:.3f}x")
+                self.log(f"Scaled content: {scaled_width}x{scaled_height}")
+                self.log(f"Centered with offset: {offset_x}px left, {offset_y}px top")
+                self.log(f"Background color for padding: {bg_color_hex}")
 
-                document.body.style.margin = '0';
-                document.body.style.padding = '0';
-                document.body.style.overflow = 'hidden';
-                document.body.style.width = '{native_width}px';
-                document.body.style.height = '{native_height}px';
-                document.body.style.minWidth = '{native_width}px';
-                document.body.style.minHeight = '{native_height}px';
-                document.body.style.maxWidth = '{native_width}px';
-                document.body.style.maxHeight = '{native_height}px';
+                # Apply CSS scaling - browser renders at HIGH RES, content scales to fit
+                css_scaling = f"""
+                    // Set html/body to full viewport for high-res rendering
+                    document.documentElement.style.margin = '0';
+                    document.documentElement.style.padding = '0';
+                    document.documentElement.style.width = '{target_width}px';
+                    document.documentElement.style.height = '{target_height}px';
+                    document.documentElement.style.overflow = 'hidden';
+                    document.documentElement.style.background = '{bg_color_hex}';
 
-                // Ensure canvas elements render at proper size
-                var canvases = document.getElementsByTagName('canvas');
-                for (var i = 0; i < canvases.length; i++) {{
-                    var canvas = canvases[i];
-                    // Only set style if not already set by HTML5 code
-                    if (!canvas.style.width) canvas.style.width = '{native_width}px';
-                    if (!canvas.style.height) canvas.style.height = '{native_height}px';
-                }}
-            """
-            driver.execute_script(js_resize)
-            self.log(f"Viewport set to native dimensions: {native_width}x{native_height}")
+                    document.body.style.margin = '0';
+                    document.body.style.padding = '0';
+                    document.body.style.overflow = 'hidden';
+                    document.body.style.background = '{bg_color_hex}';
+
+                    // Create wrapper for scaled content
+                    var wrapper = document.createElement('div');
+                    wrapper.id = '__hires_wrapper__';
+                    wrapper.style.position = 'absolute';
+                    wrapper.style.left = '{offset_x}px';
+                    wrapper.style.top = '{offset_y}px';
+                    wrapper.style.width = '{config.width}px';
+                    wrapper.style.height = '{config.height}px';
+                    wrapper.style.transform = 'scale({scale})';
+                    wrapper.style.transformOrigin = 'top left';
+
+                    // Move all body children into wrapper
+                    while (document.body.firstChild) {{
+                        wrapper.appendChild(document.body.firstChild);
+                    }}
+                    document.body.appendChild(wrapper);
+
+                    // CRITICAL: Scale canvas internal buffers for sharp rendering
+                    var canvases = wrapper.getElementsByTagName('canvas');
+                    for (var i = 0; i < canvases.length; i++) {{
+                        var canvas = canvases[i];
+                        var origW = canvas.width;
+                        var origH = canvas.height;
+
+                        // Scale internal buffer to high-res
+                        canvas.width = Math.floor(origW * {scale});
+                        canvas.height = Math.floor(origH * {scale});
+
+                        // Set CSS size to match original layout
+                        canvas.style.width = origW + 'px';
+                        canvas.style.height = origH + 'px';
+
+                        console.log('Scaled canvas buffer:', origW + 'x' + origH, '→', canvas.width + 'x' + canvas.height);
+
+                        // Try to trigger redraw
+                        if (window.render) window.render();
+                        if (canvas.render) canvas.render();
+                    }}
+
+                    console.log('High-res rendering setup complete: {target_width}x{target_height}');
+                """
+                driver.execute_script(css_scaling)
+                self.log(f"Applied high-resolution CSS scaling")
+            else:
+                # No format change needed - use original dimensions
+                self.log(f"=== STANDARD RENDERING ===")
+                js_standard = f"""
+                    document.documentElement.style.margin = '0';
+                    document.documentElement.style.padding = '0';
+                    document.documentElement.style.overflow = 'hidden';
+
+                    document.body.style.margin = '0';
+                    document.body.style.padding = '0';
+                    document.body.style.overflow = 'hidden';
+                """
+                driver.execute_script(js_standard)
+                self.log(f"Using standard rendering at {config.width}x{config.height}")
 
             # REQUIREMENT #4: Delay for page to settle
             self.log("Waiting 1.5s for page to settle...")
@@ -608,11 +650,17 @@ class HTML5ToVideoConverter:
             self.log(f"Target output size: {target_width}x{target_height}")
             self.log(f"Actual viewport: {actual_viewport_w}x{actual_viewport_h}")
             self.log(f"Actual body: {actual_body_w}x{actual_body_h}")
-            native_match_status = 'YES' if actual_viewport_w == config.width and actual_viewport_h == config.height else 'NO'
-            self.log(f"Rendering at native size: {native_match_status}")
 
-            if actual_viewport_w != config.width or actual_viewport_h != config.height:
-                self.log(f"WARNING: Viewport mismatch! Expected {config.width}x{config.height}, got {actual_viewport_w}x{actual_viewport_h}")
+            if needs_format_change:
+                hires_match = 'YES' if actual_viewport_w == target_width and actual_viewport_h == target_height else 'NO'
+                self.log(f"High-res viewport match: {hires_match}")
+                if actual_viewport_w != target_width or actual_viewport_h != target_height:
+                    self.log(f"WARNING: Viewport mismatch! Expected {target_width}x{target_height}, got {actual_viewport_w}x{actual_viewport_h}")
+            else:
+                native_match = 'YES' if actual_viewport_w == config.width and actual_viewport_h == config.height else 'NO'
+                self.log(f"Native size match: {native_match}")
+                if actual_viewport_w != config.width or actual_viewport_h != config.height:
+                    self.log(f"WARNING: Viewport mismatch! Expected {config.width}x{config.height}, got {actual_viewport_w}x{actual_viewport_h}")
 
             # Trigger animations and prepare for recording
             self.log(f"=== ANIMATION SETUP ===")
@@ -836,8 +884,7 @@ class HTML5ToVideoConverter:
                     self.log(f"Capturing frame {frame_num + 1}/{total_frames}")
                 driver.save_screenshot(temp_screenshot)
 
-                # REQUIREMENT #6: Save frames at NATIVE size (no browser scaling)
-                # FFmpeg will handle padding to target format
+                # REQUIREMENT #6: Save frames at target resolution (high-res browser rendering)
                 with Image.open(temp_screenshot) as img:
                     screenshot_w, screenshot_h = img.size
 
@@ -845,47 +892,47 @@ class HTML5ToVideoConverter:
                     if frame_num == 0:
                         self.log(f"=== SCREENSHOT ANALYSIS ===")
                         self.log(f"Screenshot size: {screenshot_w}x{screenshot_h}")
-                        self.log(f"Native HTML5 size: {native_width}x{native_height}")
-                        self.log(f"Width diff: {screenshot_w - native_width:+d}px")
-                        self.log(f"Height diff: {screenshot_h - native_height:+d}px")
+                        self.log(f"Target size: {target_width}x{target_height}")
+                        self.log(f"Width diff: {screenshot_w - target_width:+d}px")
+                        self.log(f"Height diff: {screenshot_h - target_height:+d}px")
 
-                        # Case 1: Larger - crop to native size from center
-                        if screenshot_w >= native_width and screenshot_h >= native_height:
+                        # Case 1: Larger - crop to target size from center
+                        if screenshot_w >= target_width and screenshot_h >= target_height:
                             # Calculate center crop coordinates
-                            left = (screenshot_w - native_width) // 2
-                            top = (screenshot_h - native_height) // 2
-                            right = left + native_width
-                            bottom = top + native_height
+                            left = (screenshot_w - target_width) // 2
+                            top = (screenshot_h - target_height) // 2
+                            right = left + target_width
+                            bottom = top + target_height
 
-                            self.log(f"Action: CENTER CROP ({screenshot_w}x{screenshot_h} → {native_width}x{native_height})")
+                            self.log(f"Action: CENTER CROP ({screenshot_w}x{screenshot_h} → {target_width}x{target_height})")
                             if left > 0 or top > 0:
                                 self.log(f"Crop offset: left={left}px, top={top}px")
                             corrected = img.crop((left, top, right, bottom))
                             corrected.save(frame_path)
 
-                        # Case 2: Smaller - resize to native
-                        elif screenshot_w < native_width or screenshot_h < native_height:
-                            self.log(f"Action: RESIZE with LANCZOS ({screenshot_w}x{screenshot_h} → {native_width}x{native_height})")
+                        # Case 2: Smaller - resize to target
+                        elif screenshot_w < target_width or screenshot_h < target_height:
+                            self.log(f"Action: RESIZE with LANCZOS ({screenshot_w}x{screenshot_h} → {target_width}x{target_height})")
                             self.log(f"WARNING: Screenshot smaller than expected!")
-                            corrected = img.resize((native_width, native_height), Image.Resampling.LANCZOS)
+                            corrected = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
                             corrected.save(frame_path)
 
                         # Case 3: Exact match
                         else:
-                            self.log(f"Action: EXACT MATCH at native size - no correction needed")
+                            self.log(f"Action: EXACT MATCH - frames at target resolution!")
                             img.save(frame_path)
                     else:
                         # For subsequent frames, just do the correction without logging
-                        if screenshot_w >= native_width and screenshot_h >= native_height:
+                        if screenshot_w >= target_width and screenshot_h >= target_height:
                             # Center crop for subsequent frames too
-                            left = (screenshot_w - native_width) // 2
-                            top = (screenshot_h - native_height) // 2
-                            right = left + native_width
-                            bottom = top + native_height
+                            left = (screenshot_w - target_width) // 2
+                            top = (screenshot_h - target_height) // 2
+                            right = left + target_width
+                            bottom = top + target_height
                             corrected = img.crop((left, top, right, bottom))
                             corrected.save(frame_path)
-                        elif screenshot_w < native_width or screenshot_h < native_height:
-                            corrected = img.resize((native_width, native_height), Image.Resampling.LANCZOS)
+                        elif screenshot_w < target_width or screenshot_h < target_height:
+                            corrected = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
                             corrected.save(frame_path)
                         else:
                             img.save(frame_path)
@@ -899,10 +946,10 @@ class HTML5ToVideoConverter:
                             self.log(f"=== DEBUG FRAME OUTPUT ===")
                             self.log(f"Saved: frame_fixed.png")
                             self.log(f"Final dimensions: {final_w}x{final_h}")
-                            match = "YES" if final_w == native_width and final_h == native_height else "NO"
-                            self.log(f"Dimensions match native: {match}")
+                            match = "YES" if final_w == target_width and final_h == target_height else "NO"
+                            self.log(f"Dimensions match target: {match}")
                             if match == "NO":
-                                self.log(f"ERROR: Expected {native_width}x{native_height}, got {final_w}x{final_h}")
+                                self.log(f"ERROR: Expected {target_width}x{target_height}, got {final_w}x{final_h}")
 
                 os.unlink(temp_screenshot)
 
@@ -929,7 +976,8 @@ class HTML5ToVideoConverter:
                 self.log("Failed to close browser")
             return None, None
 
-        return frames_dir, padding_info
+        # No padding needed - frames are already at target resolution
+        return frames_dir, None
 
     def encode_video(self, frames_dir: str, output_path: str, config: VideoConfig, padding_info: dict = None) -> bool:
         """Encode frames to video using FFmpeg
