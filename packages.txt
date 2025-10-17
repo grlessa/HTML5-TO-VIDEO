@@ -1,3 +1,6 @@
 chromium
 chromium-driver
 ffmpeg
+fonts-noto-color-emoji
+fonts-liberation
+fonts-dejavu-core
