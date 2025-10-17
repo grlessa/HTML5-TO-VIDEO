@@ -1542,38 +1542,10 @@ def main():
         # Info about automatic format detection
         st.info("ℹ️ Output format is automatically detected (1080x1080 or 1080x1920) based on source aspect ratio")
 
-        # Manual mode settings
+        # Manual mode settings (will be populated after file upload for auto-detect options)
         if mode == "Manual":
-            st.markdown("**Manual Settings**")
-            col1, col2 = st.columns(2)
-            with col1:
-                width = st.number_input("Width", 100, 3840, 1920)  # Cap at 4K
-                fps = st.number_input("FPS", 1, 60, 60)  # Cap at 60fps
-            with col2:
-                height = st.number_input("Height", 100, 2160, 1080)  # Cap at 4K
-                duration = st.number_input("Duration", 1, 300, 10)  # Cap at 5 minutes
-
-            # Animation speed control
-            st.markdown("**Animation Speed**")
-            animation_speed = st.slider(
-                "Animation playback speed",
-                min_value=0.5,
-                max_value=1.5,
-                value=0.85,
-                step=0.05,
-                help="Adjust animation playback speed. 0.85 = 15% slower (recommended), 1.0 = normal speed, 1.5 = 50% faster"
-            )
-
-            # Validate total computational load
-            total_frames = fps * duration
-            total_pixels = width * height * total_frames
-
-            # Max: 4K @ 60fps for 60 seconds = 497,664,000 pixels
-            max_pixels = 3840 * 2160 * 60 * 60
-            if total_pixels > max_pixels:
-                st.error("❌ Configuration too demanding")
-                st.info(f"Total processing load: {total_pixels:,} pixel-frames. Maximum: {max_pixels:,}. Try reducing resolution, FPS, or duration.")
-                st.stop()
+            # Placeholder - will be filled after file upload with auto-detect options
+            pass
 
     # Right column: Preview area (placeholder initially)
     with right_col:
@@ -1605,58 +1577,138 @@ def main():
             temp_zip.write(uploaded_file.read())
             temp_zip.close()
 
-            # Auto-detect if in auto mode
+            # Analyze HTML5 content for both Auto and Manual modes
+            with st.spinner("Analyzing HTML5 content..."):
+                temp_extract = tempfile.mkdtemp()
+                with zipfile.ZipFile(temp_zip.name, 'r') as zip_ref:
+                    zip_ref.extractall(temp_extract)
+
+                html_files = list(Path(temp_extract).rglob("*.html"))
+                if html_files:
+                    main_html = None
+                    for html_file in html_files:
+                        if html_file.name.lower() in ['index.html', 'index.htm']:
+                            main_html = html_file
+                            break
+                    if not main_html:
+                        main_html = html_files[0]
+
+                    analyzer = HTML5Analyzer()
+                    detected = analyzer.analyze_html(str(main_html))
+
+                    detected_width = detected['width']
+                    detected_height = detected['height']
+                    detected_duration = detected['duration']
+                    detected_fps = detected['fps']
+
+                else:
+                    st.warning("No HTML files found, using defaults")
+                    detected_width, detected_height, detected_fps, detected_duration = 1920, 1080, 60, 10
+
+                shutil.rmtree(temp_extract)
+
+            # Mode-specific UI
             if mode == "Auto":
-                with st.spinner("Analyzing HTML5 content..."):
-                    temp_extract = tempfile.mkdtemp()
-                    with zipfile.ZipFile(temp_zip.name, 'r') as zip_ref:
-                        zip_ref.extractall(temp_extract)
+                width = detected_width
+                height = detected_height
+                duration = detected_duration
+                fps = detected_fps
 
-                    html_files = list(Path(temp_extract).rglob("*.html"))
-                    if html_files:
-                        main_html = None
-                        for html_file in html_files:
-                            if html_file.name.lower() in ['index.html', 'index.htm']:
-                                main_html = html_file
-                                break
-                        if not main_html:
-                            main_html = html_files[0]
+                st.write("**Auto-detected settings:**")
+                col1, col2, col3, col4, col5 = st.columns(5)
+                col1.metric("Resolution", f"{width}x{height}")
+                col2.metric("FPS", fps)
+                col3.metric("Duration", f"{duration}s")
+                col4.metric("Quality", "High")
+                col5.metric("Anim Speed", "0.85x")
 
-                        analyzer = HTML5Analyzer()
-                        detected = analyzer.analyze_html(str(main_html))
+                # Detect and show output format
+                from app import FormatCSS
+                output_width, output_height, format_name = FormatCSS.detect_best_format(width, height)
+                st.info(f"📐 **Output Format:** {format_name} - Your content will be automatically fitted to {output_width}x{output_height} with aspect ratio preserved")
 
-                        width = detected['width']
-                        height = detected['height']
-                        duration = detected['duration']
-                        fps = detected['fps']
+                # Use optimal settings for high quality (compatible with st.video)
+                codec = "libx264"
+                preset = "slow"
+                crf = 18  # High quality (compatible with web players)
+                bitrate = "10M"
+                animation_speed = 0.85  # Default: 15% slower for better visibility
 
-                        st.write("**Auto-detected settings:**")
-                        col1, col2, col3, col4, col5 = st.columns(5)
-                        col1.metric("Resolution", f"{width}x{height}")
-                        col2.metric("FPS", fps)
-                        col3.metric("Duration", f"{duration}s")
-                        col4.metric("Quality", "High")
-                        col5.metric("Anim Speed", "0.85x")
+            else:  # Manual mode
+                st.markdown("**Manual Settings with Auto-Detect Options**")
+                st.info(f"💡 Auto-detected: {detected_width}x{detected_height}, {detected_fps} FPS, {detected_duration}s duration")
 
-                        # Detect and show output format
-                        from app import FormatCSS
-                        output_width, output_height, format_name = FormatCSS.detect_best_format(width, height)
-                        st.info(f"📐 **Output Format:** {format_name} - Your content will be automatically fitted to {output_width}x{output_height} with aspect ratio preserved")
-
-                        # Use optimal settings for high quality (compatible with st.video)
-                        codec = "libx264"
-                        preset = "slow"
-                        crf = 18  # High quality (compatible with web players)
-                        bitrate = "10M"
-                        animation_speed = 0.85  # Default: 15% slower for better visibility
-
+                # Width
+                col1, col2 = st.columns([1, 4])
+                with col1:
+                    use_auto_width = st.checkbox("Auto", value=False, key="auto_width", help="Use auto-detected width")
+                with col2:
+                    if use_auto_width:
+                        width = detected_width
+                        st.number_input("Width", 100, 3840, width, disabled=True, key="width_input")
                     else:
-                        st.warning("No HTML files found, using defaults")
-                        width, height, fps, duration = 1920, 1080, 60, 10
-                        codec, preset, crf, bitrate = "libx264", "slow", 18, "10M"
-                        animation_speed = 0.85  # Default: 15% slower for better visibility
+                        width = st.number_input("Width", 100, 3840, detected_width, key="width_input")
 
-                    shutil.rmtree(temp_extract)
+                # Height
+                col1, col2 = st.columns([1, 4])
+                with col1:
+                    use_auto_height = st.checkbox("Auto", value=False, key="auto_height", help="Use auto-detected height")
+                with col2:
+                    if use_auto_height:
+                        height = detected_height
+                        st.number_input("Height", 100, 2160, height, disabled=True, key="height_input")
+                    else:
+                        height = st.number_input("Height", 100, 2160, detected_height, key="height_input")
+
+                # FPS
+                col1, col2 = st.columns([1, 4])
+                with col1:
+                    use_auto_fps = st.checkbox("Auto", value=False, key="auto_fps", help="Use auto-detected FPS")
+                with col2:
+                    if use_auto_fps:
+                        fps = detected_fps
+                        st.number_input("FPS", 1, 60, fps, disabled=True, key="fps_input")
+                    else:
+                        fps = st.number_input("FPS", 1, 60, detected_fps, key="fps_input")
+
+                # Duration
+                col1, col2 = st.columns([1, 4])
+                with col1:
+                    use_auto_duration = st.checkbox("Auto", value=False, key="auto_duration", help="Use auto-detected duration")
+                with col2:
+                    if use_auto_duration:
+                        duration = detected_duration
+                        st.number_input("Duration (seconds)", 1, 300, duration, disabled=True, key="duration_input")
+                    else:
+                        duration = st.number_input("Duration (seconds)", 1, 300, detected_duration, key="duration_input")
+
+                # Animation speed control
+                st.markdown("**Animation Speed**")
+                animation_speed = st.slider(
+                    "Animation playback speed",
+                    min_value=0.5,
+                    max_value=1.5,
+                    value=0.85,
+                    step=0.05,
+                    help="Adjust animation playback speed. 0.85 = 15% slower (recommended), 1.0 = normal speed, 1.5 = 50% faster"
+                )
+
+                # Use optimal settings for high quality
+                codec = "libx264"
+                preset = "slow"
+                crf = 18
+                bitrate = "10M"
+
+                # Validate total computational load
+                total_frames = fps * duration
+                total_pixels = width * height * total_frames
+
+                # Max: 4K @ 60fps for 60 seconds = 497,664,000 pixels
+                max_pixels = 3840 * 2160 * 60 * 60
+                if total_pixels > max_pixels:
+                    st.error("❌ Configuration too demanding")
+                    st.info(f"Total processing load: {total_pixels:,} pixel-frames. Maximum: {max_pixels:,}. Try reducing resolution, FPS, or duration.")
+                    st.stop()
 
             # Convert button
             if st.button("Convert to Video", use_container_width=True):
