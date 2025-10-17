@@ -560,8 +560,9 @@ class HTML5ToVideoConverter:
                 self.log(f"Centered with offset: {offset_x}px left, {offset_y}px top")
                 self.log(f"Background color for padding: {bg_color_hex}")
 
-                # Apply CSS scaling - browser renders at HIGH RES, content scales to fit
-                css_scaling = f"""
+                # Apply CSS zoom for high-res rendering with proper layout
+                # CSS zoom affects BOTH rendering AND layout (unlike transform)
+                css_zoom_setup = f"""
                     // Set html/body to full viewport for high-res rendering
                     // Use flexbox centering to ensure content is ALWAYS centered in viewport
                     document.documentElement.style.margin = '0';
@@ -589,17 +590,16 @@ class HTML5ToVideoConverter:
                     container.style.height = '{target_height}px';
                     container.style.background = '{bg_color_hex}';
                     container.style.overflow = 'hidden';
+                    container.style.display = 'flex';
+                    container.style.alignItems = 'center';
+                    container.style.justifyContent = 'center';
 
-                    // Create wrapper for scaled content inside container
+                    // Create wrapper with CSS zoom (affects layout AND rendering)
                     var wrapper = document.createElement('div');
                     wrapper.id = '__hires_wrapper__';
-                    wrapper.style.position = 'absolute';
-                    wrapper.style.left = '{offset_x}px';
-                    wrapper.style.top = '{offset_y}px';
                     wrapper.style.width = '{config.width}px';
                     wrapper.style.height = '{config.height}px';
-                    wrapper.style.transform = 'scale({scale})';
-                    wrapper.style.transformOrigin = 'top left';
+                    wrapper.style.zoom = '{scale}';  // CSS zoom affects layout calculations!
 
                     // Move all body children into wrapper
                     while (document.body.firstChild) {{
@@ -619,9 +619,9 @@ class HTML5ToVideoConverter:
                         canvas.width = Math.floor(origW * {scale});
                         canvas.height = Math.floor(origH * {scale});
 
-                        // Set CSS size to match original layout
-                        canvas.style.width = origW + 'px';
-                        canvas.style.height = origH + 'px';
+                        // CSS size will be handled by zoom
+                        if (!canvas.style.width) canvas.style.width = origW + 'px';
+                        if (!canvas.style.height) canvas.style.height = origH + 'px';
 
                         console.log('Scaled canvas buffer:', origW + 'x' + origH, '→', canvas.width + 'x' + canvas.height);
 
@@ -630,10 +630,10 @@ class HTML5ToVideoConverter:
                         if (canvas.render) canvas.render();
                     }}
 
-                    console.log('High-res rendering setup complete: {target_width}x{target_height}');
+                    console.log('High-res rendering with CSS zoom complete: {target_width}x{target_height}');
                 """
-                driver.execute_script(css_scaling)
-                self.log(f"Applied high-resolution CSS scaling")
+                driver.execute_script(css_zoom_setup)
+                self.log(f"Applied high-resolution CSS zoom (affects layout)")
             else:
                 # No format change needed - use original dimensions
                 self.log(f"=== STANDARD RENDERING ===")
