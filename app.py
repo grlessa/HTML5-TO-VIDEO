@@ -1657,6 +1657,7 @@ def main():
                         duration = st.number_input("Seconds", 1, 300, detected_duration, key="duration_input")
                     else:
                         duration = detected_duration
+                        st.caption(f"{detected_duration}s (auto)")
 
                 with col2:
                     from app import FormatCSS
