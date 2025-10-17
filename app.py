@@ -1524,13 +1524,13 @@ def main():
             margin: 20px 0;
         }
 
-        /* Smaller video preview for sharper low-res content */
+        /* Larger video preview */
         .stVideo {
             max-width: 100% !important;
         }
 
         .stVideo video {
-            max-height: 250px !important;
+            max-height: 500px !important;
             height: auto !important;
             max-width: 100% !important;
             width: auto !important;
@@ -1542,7 +1542,7 @@ def main():
 
         /* Also target the video element directly */
         video {
-            max-height: 250px !important;
+            max-height: 500px !important;
         }
 
         /* Make expander more discrete */
