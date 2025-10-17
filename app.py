@@ -1695,8 +1695,13 @@ def main():
 
             # Convert button
             if st.button("Convert to Video", use_container_width=True):
-                output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-                output_file.close()
+                # Use the same name as input ZIP file
+                base_name = os.path.splitext(uploaded_file.name)[0]  # Remove .zip extension
+                output_filename = f"{base_name}.mp4"
+                output_path = os.path.join(tempfile.gettempdir(), output_filename)
+
+                # Create output file path (will be overwritten if exists)
+                output_file = type('obj', (object,), {'name': output_path})()
 
                 config = VideoConfig(
                     width=width,
@@ -1773,11 +1778,11 @@ def main():
                     # Show video preview
                     preview_placeholder.video(video_bytes)
 
-                    # Add download button
+                    # Add download button with same name as input file
                     download_placeholder.download_button(
                         label="Download Video",
                         data=video_bytes,
-                        file_name="converted_video.mp4",
+                        file_name=output_filename,
                         mime="video/mp4",
                         use_container_width=True
                     )
