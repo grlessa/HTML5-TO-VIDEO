@@ -702,9 +702,9 @@ class HTML5ToVideoConverter:
                     self.log(f"After correction: {new_viewport_w}x{new_viewport_h}")
 
                     if new_viewport_w == target_width and new_viewport_h == target_height:
-                        self.log(f"✓ Viewport corrected successfully!")
+                        self.log(f"SUCCESS: Viewport corrected successfully!")
                     else:
-                        self.log(f"⚠ Viewport still mismatched, will continue anyway")
+                        self.log(f"WARNING: Viewport still mismatched, will continue anyway")
             else:
                 native_match = 'YES' if actual_viewport_w == config.width and actual_viewport_h == config.height else 'NO'
                 self.log(f"Native size match: {native_match}")
@@ -1362,7 +1362,7 @@ def main():
     # Page config
     st.set_page_config(
         page_title="HTML5 to Video Converter",
-        page_icon="🎬",
+        page_icon="🎥",  # Using simpler emoji that's more widely supported
         layout="wide",
         initial_sidebar_state="expanded"
     )
