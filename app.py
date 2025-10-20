@@ -1567,9 +1567,9 @@ def main():
     with left_col:
         # Upload section
         uploaded_file = st.file_uploader(
-            "Upload HTML5 ZIP file",
-            type=['zip'],
-            help="ZIP file containing HTML, CSS, JS, images, and all assets"
+            "Upload HTML5 ZIP file or HTML file",
+            type=['zip', 'html', 'htm'],
+            help="ZIP file containing HTML, CSS, JS, images, and all assets OR a standalone HTML file"
         )
 
     # Right column: Preview area (placeholder initially)
@@ -1585,9 +1585,10 @@ def main():
     with left_col:
         if uploaded_file:
             # Validate file
-            if not uploaded_file.name.lower().endswith('.zip'):
-                st.error("❌ Please upload a ZIP file")
-                st.info("Your HTML5 content should be packaged as a .zip file")
+            file_extension = uploaded_file.name.lower().split('.')[-1]
+            if file_extension not in ['zip', 'html', 'htm']:
+                st.error("❌ Please upload a ZIP or HTML file")
+                st.info("Your HTML5 content should be packaged as a .zip file or a standalone .html file")
                 st.stop()
 
             # Check file size (50MB limit)
@@ -1597,10 +1598,29 @@ def main():
                 st.info("Maximum file size: 50 MB")
                 st.stop()
 
-            # Save uploaded file
-            temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
-            temp_zip.write(uploaded_file.read())
-            temp_zip.close()
+            # Determine if this is a ZIP or HTML file
+            is_zip = file_extension == 'zip'
+
+            if is_zip:
+                # Save uploaded ZIP file
+                temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
+                temp_zip.write(uploaded_file.read())
+                temp_zip.close()
+            else:
+                # Save uploaded HTML file and create a temporary ZIP from it
+                temp_html = tempfile.NamedTemporaryFile(delete=False, suffix='.html', mode='w', encoding='utf-8')
+                temp_html.write(uploaded_file.read().decode('utf-8'))
+                temp_html.close()
+
+                # Create a ZIP file containing just the HTML
+                temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
+                temp_zip.close()  # Close before writing with zipfile
+
+                with zipfile.ZipFile(temp_zip.name, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    zipf.write(temp_html.name, arcname='index.html')
+
+                # Clean up temp HTML file
+                os.unlink(temp_html.name)
 
             # Analyze HTML5 content for both Auto and Manual modes
             with st.spinner("Analyzing HTML5 content..."):
