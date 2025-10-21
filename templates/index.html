@@ -401,27 +401,44 @@
                 method: 'POST',
                 body: formData
             })
-            .then(response => {
+            .then(async response => {
                 if (!response.ok) {
+                    // Try to get error message from JSON
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Conversion failed');
+                    }
                     throw new Error('Conversion failed');
                 }
                 return response.blob();
             })
             .then(blob => {
+                console.log('Received video blob:', blob.size, 'bytes');
+
                 // Hide progress, show result
                 document.getElementById('progress').style.display = 'none';
                 document.getElementById('result').style.display = 'block';
 
                 // Create video preview
                 const videoUrl = URL.createObjectURL(blob);
-                document.getElementById('videoPreview').src = videoUrl;
+                console.log('Created video URL:', videoUrl);
+
+                const videoPreview = document.getElementById('videoPreview');
+                videoPreview.src = videoUrl;
+
+                // Force video to load
+                videoPreview.load();
 
                 // Setup download
                 const downloadBtn = document.getElementById('downloadBtn');
                 downloadBtn.href = videoUrl;
                 downloadBtn.download = uploadedFile.name.replace(/\.(zip|html|htm)$/, '.mp4');
+
+                console.log('Video preview and download ready');
             })
             .catch(error => {
+                console.error('Conversion error:', error);
                 document.getElementById('progress').style.display = 'none';
                 document.getElementById('settings').style.display = 'block';
                 showError('Conversion failed: ' + error.message);

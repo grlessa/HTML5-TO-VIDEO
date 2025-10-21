@@ -3,7 +3,9 @@ services:
     name: html5-to-video
     env: python
     buildCommand: "apt-get update && apt-get install -y chromium chromium-driver ffmpeg fonts-liberation && pip install -r requirements-flask.txt"
-    startCommand: "gunicorn flask_app:app"
+    startCommand: "gunicorn flask_app:app --timeout 300 --workers 2"
     envVars:
       - key: PYTHON_VERSION
         value: 3.11
+      - key: WEB_CONCURRENCY
+        value: 2

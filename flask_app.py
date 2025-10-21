@@ -4,7 +4,7 @@ HTML5 to Video Converter - Simple Flask Web App
 Works anywhere Python runs
 """
 
-from flask import Flask, render_template, request, send_file, jsonify
+from flask import Flask, render_template, request, send_file, jsonify, Response
 import os
 import tempfile
 import zipfile
@@ -16,6 +16,15 @@ from converter import HTML5ToVideoConverter, VideoConfig, HTML5Analyzer, FormatC
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching
+
+# Add CORS headers for all responses
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST')
+    return response
 
 
 @app.route('/')
@@ -174,19 +183,28 @@ def convert():
         success = converter.convert(temp_zip, output_path, config)
 
         if not success or not os.path.exists(output_path):
-            return jsonify({'error': 'Conversion failed'}), 500
+            return jsonify({'error': 'Conversion failed', 'log': converter.get_debug_output()}), 500
 
-        # Send file
-        return send_file(
-            output_path,
-            as_attachment=True,
-            download_name=f"{base_name}.mp4",
-            mimetype='video/mp4'
+        # Read video into memory so we can cleanup temp dir
+        with open(output_path, 'rb') as f:
+            video_data = f.read()
+
+        # Cleanup temp directory
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+        # Return video data as blob
+        return Response(
+            video_data,
+            mimetype='video/mp4',
+            headers={
+                'Content-Disposition': f'attachment; filename="{base_name}.mp4"'
+            }
         )
 
-    finally:
-        # Cleanup after sending (Flask will handle this)
-        pass
+    except Exception as e:
+        # Cleanup on error
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
