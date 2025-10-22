@@ -407,7 +407,12 @@
                     const contentType = response.headers.get('content-type');
                     if (contentType && contentType.includes('application/json')) {
                         const errorData = await response.json();
-                        throw new Error(errorData.error || 'Conversion failed');
+                        let errorMsg = errorData.error || 'Conversion failed';
+                        if (errorData.details) {
+                            console.error('Server error details:', errorData.details);
+                            errorMsg += ' (check browser console for details)';
+                        }
+                        throw new Error(errorMsg);
                     }
                     throw new Error('Conversion failed');
                 }

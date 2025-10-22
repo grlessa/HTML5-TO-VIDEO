@@ -180,10 +180,23 @@ def convert():
         output_path = os.path.join(temp_dir, f"{base_name}.mp4")
 
         converter = HTML5ToVideoConverter()
+
+        # Log to console for Render debugging
+        print(f"[CONVERT] Starting conversion for {base_name}")
+        print(f"[CONVERT] Config: {config.width}x{config.height}, {config.fps}fps, {config.duration}s")
+
         success = converter.convert(temp_zip, output_path, config)
 
+        print(f"[CONVERT] Conversion success: {success}")
+        print(f"[CONVERT] Output exists: {os.path.exists(output_path)}")
+
         if not success or not os.path.exists(output_path):
-            return jsonify({'error': 'Conversion failed', 'log': converter.get_debug_output()}), 500
+            debug_log = converter.get_debug_output()
+            print(f"[CONVERT] FAILED - Debug log:\n{debug_log}")
+            return jsonify({
+                'error': 'Conversion failed - check Render logs for details',
+                'details': debug_log[-1000:]  # Last 1000 chars
+            }), 500
 
         # Read video into memory so we can cleanup temp dir
         with open(output_path, 'rb') as f:

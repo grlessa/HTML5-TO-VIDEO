@@ -462,12 +462,16 @@ class HTML5ToVideoConverter:
 
         # Find browser binary
         browser_paths = [
-            "/Applications/Comet.app/Contents/MacOS/Comet",
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-            "/Applications/Chromium.app/Contents/MacOS/Chromium",
-            "/usr/bin/chromium",
-            "/usr/bin/chromium-browser",
-            "/usr/bin/google-chrome"
+            "/Applications/Comet.app/Contents/MacOS/Comet",  # macOS
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",  # macOS
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",  # macOS
+            "/usr/bin/chromium",  # Linux
+            "/usr/bin/chromium-browser",  # Linux
+            "/usr/bin/google-chrome",  # Linux
+            "/usr/bin/google-chrome-stable",  # Linux
+            "/snap/bin/chromium",  # Linux snap
+            "chromium",  # PATH fallback
+            "chromium-browser",  # PATH fallback
         ]
 
         browser_found = None
@@ -479,7 +483,8 @@ class HTML5ToVideoConverter:
                 break
 
         if not browser_found:
-            self.log("WARNING: No browser binary found, using system default")
+            self.log("WARNING: No browser binary found in common paths, using system default")
+            self.log(f"Searched paths: {', '.join(browser_paths)}")
 
         try:
             self.log("Creating WebDriver instance...")
