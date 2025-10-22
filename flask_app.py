@@ -33,6 +33,75 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/health')
+def health():
+    """Health check - verify system dependencies"""
+    import subprocess
+    import shutil
+
+    status = {
+        'status': 'ok',
+        'dependencies': {}
+    }
+
+    # Check Python packages
+    try:
+        from selenium import webdriver
+        status['dependencies']['selenium'] = 'installed'
+    except ImportError:
+        status['dependencies']['selenium'] = 'missing'
+        status['status'] = 'error'
+
+    try:
+        from PIL import Image
+        status['dependencies']['pillow'] = 'installed'
+    except ImportError:
+        status['dependencies']['pillow'] = 'missing'
+        status['status'] = 'error'
+
+    # Check Chromium
+    chromium_paths = [
+        "/usr/bin/chromium",
+        "/usr/bin/chromium-browser",
+        "/usr/bin/google-chrome",
+        "chromium",
+        "chromium-browser"
+    ]
+
+    chromium_found = None
+    for path in chromium_paths:
+        if shutil.which(path) or os.path.exists(path):
+            chromium_found = path
+            break
+
+    if chromium_found:
+        status['dependencies']['chromium'] = f'found at {chromium_found}'
+    else:
+        status['dependencies']['chromium'] = 'NOT FOUND'
+        status['status'] = 'error'
+
+    # Check ChromeDriver
+    try:
+        result = subprocess.run(['chromedriver', '--version'],
+                              capture_output=True, text=True, timeout=5)
+        status['dependencies']['chromedriver'] = result.stdout.strip()
+    except Exception as e:
+        status['dependencies']['chromedriver'] = f'NOT FOUND: {str(e)}'
+        status['status'] = 'error'
+
+    # Check FFmpeg
+    try:
+        result = subprocess.run(['ffmpeg', '-version'],
+                              capture_output=True, text=True, timeout=5)
+        version = result.stdout.split('\n')[0]
+        status['dependencies']['ffmpeg'] = version
+    except Exception as e:
+        status['dependencies']['ffmpeg'] = f'NOT FOUND: {str(e)}'
+        status['status'] = 'error'
+
+    return jsonify(status)
+
+
 @app.route('/analyze', methods=['POST'])
 def analyze():
     """Analyze uploaded HTML5 file"""
@@ -216,8 +285,16 @@ def convert():
 
     except Exception as e:
         # Cleanup on error
+        import traceback
+        error_traceback = traceback.format_exc()
+        print(f"[CONVERT] EXCEPTION: {str(e)}")
+        print(f"[CONVERT] Traceback:\n{error_traceback}")
+
         shutil.rmtree(temp_dir, ignore_errors=True)
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'error': f'Server error: {str(e)}',
+            'details': error_traceback[-500:]  # Last 500 chars of traceback
+        }), 500
 
 
 if __name__ == '__main__':
