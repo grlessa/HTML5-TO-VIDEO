@@ -37,88 +37,225 @@ def apply_custom_styling():
     """Apply custom CSS styling to Streamlit app."""
     st.markdown("""
         <style>
-        /* Dark theme with orange accents */
+        :root {
+            --background: oklch(1 0 0);
+            --foreground: oklch(0.1450 0 0);
+            --card: oklch(1 0 0);
+            --card-foreground: oklch(0.1450 0 0);
+            --popover: oklch(1 0 0);
+            --popover-foreground: oklch(0.1450 0 0);
+            --primary: oklch(0.2050 0 0);
+            --primary-foreground: oklch(0.9850 0 0);
+            --secondary: oklch(0.9700 0 0);
+            --secondary-foreground: oklch(0.2050 0 0);
+            --muted: oklch(0.9700 0 0);
+            --muted-foreground: oklch(0.5560 0 0);
+            --accent: oklch(0.9700 0 0);
+            --accent-foreground: oklch(0.2050 0 0);
+            --destructive: oklch(0.5770 0.2450 27.3250);
+            --destructive-foreground: oklch(1 0 0);
+            --border: oklch(0.9220 0 0);
+            --input: oklch(0.9220 0 0);
+            --ring: oklch(0.7080 0 0);
+            --chart-1: oklch(0.8100 0.1000 252);
+            --chart-2: oklch(0.6200 0.1900 260);
+            --chart-3: oklch(0.5500 0.2200 263);
+            --chart-4: oklch(0.4900 0.2200 264);
+            --chart-5: oklch(0.4200 0.1800 266);
+            --sidebar: oklch(0.9850 0 0);
+            --sidebar-foreground: oklch(0.1450 0 0);
+            --sidebar-primary: oklch(0.2050 0 0);
+            --sidebar-primary-foreground: oklch(0.9850 0 0);
+            --sidebar-accent: oklch(0.9700 0 0);
+            --sidebar-accent-foreground: oklch(0.2050 0 0);
+            --sidebar-border: oklch(0.9220 0 0);
+            --sidebar-ring: oklch(0.7080 0 0);
+            --font-sans: Inter, ui-sans-serif, sans-serif, system-ui;
+            --font-serif: "IBM Plex Serif", ui-serif, serif;
+            --font-mono: "Intel One Mono", ui-monospace, monospace;
+            --radius: 0.625rem;
+            --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+            --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+            --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
+            --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
+            --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 2px 4px -1px hsl(0 0% 0% / 0.10);
+            --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
+            --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
+            --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+        }
+
+        .dark {
+            --background: oklch(0.1450 0 0);
+            --foreground: oklch(0.9850 0 0);
+            --card: oklch(0.2050 0 0);
+            --card-foreground: oklch(0.9850 0 0);
+            --popover: oklch(0.2690 0 0);
+            --popover-foreground: oklch(0.9850 0 0);
+            --primary: oklch(0.9220 0 0);
+            --primary-foreground: oklch(0.2050 0 0);
+            --secondary: oklch(0.2690 0 0);
+            --secondary-foreground: oklch(0.9850 0 0);
+            --muted: oklch(0.2690 0 0);
+            --muted-foreground: oklch(0.7080 0 0);
+            --accent: oklch(0.3710 0 0);
+            --accent-foreground: oklch(0.9850 0 0);
+            --destructive: oklch(0.7040 0.1910 22.2160);
+            --destructive-foreground: oklch(0.9850 0 0);
+            --border: oklch(0.2750 0 0);
+            --input: oklch(0.3250 0 0);
+            --ring: oklch(0.5560 0 0);
+            --chart-1: oklch(0.7090 0.0100 56.2590);
+            --chart-2: oklch(0.5530 0.0130 58.0710);
+            --chart-3: oklch(0.4440 0.0110 73.6390);
+            --chart-4: oklch(0.3740 0.0100 67.5580);
+            --chart-5: oklch(0.2680 0.0070 34.2980);
+            --sidebar: oklch(0.2050 0 0);
+            --sidebar-foreground: oklch(0.9850 0 0);
+            --sidebar-primary: oklch(0.3740 0.0100 67.5580);
+            --sidebar-primary-foreground: oklch(0.9850 0 0);
+            --sidebar-accent: oklch(0.2690 0 0);
+            --sidebar-accent-foreground: oklch(0.9850 0 0);
+            --sidebar-border: oklch(0.2750 0 0);
+            --sidebar-ring: oklch(0.4390 0 0);
+        }
+
         .stApp {
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            background: var(--background);
+            color: var(--foreground);
+            font-family: var(--font-sans);
         }
 
-        /* Headers */
-        h1, h2, h3 {
-            color: #ff8c42 !important;
+        h1, h2, h3, h4 {
+            color: var(--foreground) !important;
+            font-family: var(--font-serif);
         }
 
-        /* Main title */
         .main-title {
-            background: linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
             font-size: 48px;
             font-weight: 800;
             text-align: center;
             margin-bottom: 10px;
+            color: var(--foreground);
         }
 
-        /* File uploader */
         .stFileUploader {
-            background: #2d2d2d;
-            border: 2px dashed #ff8c42;
-            border-radius: 12px;
+            background: var(--card);
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
             padding: 20px;
+            box-shadow: var(--shadow);
         }
 
-        /* Buttons */
+        .stFileUploader label,
+        .stFileUploader input,
+        .stFileUploader div {
+            color: var(--foreground);
+        }
+
         .stButton>button {
-            background: linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
+            background: var(--primary);
+            color: var(--primary-foreground);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
             padding: 12px 30px;
             font-weight: 600;
             font-size: 16px;
             width: 100%;
+            box-shadow: var(--shadow-sm);
         }
 
         .stButton>button:hover {
-            background: linear-gradient(135deg, #ff5722 0%, #ff7731 100%);
-            box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4);
+            background: var(--accent);
+            color: var(--accent-foreground);
+            box-shadow: var(--shadow-lg);
         }
 
-        /* Info boxes */
         .stAlert {
-            background: #2d2d2d;
-            color: #fff;
-            border-left: 4px solid #ff8c42;
+            background: var(--muted);
+            color: var(--foreground);
+            border-left: 4px solid var(--primary);
+            border-radius: var(--radius);
         }
 
-        /* Progress bar */
+        .streamlit-expanderHeader {
+            background: var(--secondary);
+            color: var(--secondary-foreground) !important;
+            border-radius: var(--radius);
+            font-size: 14px;
+        }
+
         .stProgress > div > div {
-            background: linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%);
+            background: var(--primary);
         }
 
-        /* Video preview - larger size */
+        .stMetricLabel, .stMetricValue {
+            color: var(--foreground) !important;
+        }
+
         .stVideo {
-            max-width: 100% !important;
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 12px;
+            box-shadow: var(--shadow);
         }
 
         .stVideo video {
             max-height: 500px !important;
-            height: auto !important;
-            max-width: 100% !important;
-            width: auto !important;
+            width: 100% !important;
             object-fit: contain !important;
         }
 
-        /* Expander styling */
-        .streamlit-expanderHeader {
-            background: #2d2d2d;
-            color: #ff8c42 !important;
-            border-radius: 8px;
-            font-size: 14px;
-            opacity: 0.7;
+        .stTabs [data-baseweb="tab"] {
+            background: var(--secondary);
+            color: var(--secondary-foreground);
+            border-radius: calc(var(--radius) - 4px) calc(var(--radius) - 4px) 0 0;
         }
 
-        .streamlit-expanderHeader:hover {
-            opacity: 1;
+        .stTabs [aria-selected="true"] {
+            background: var(--primary);
+            color: var(--primary-foreground);
+        }
+
+        .stTextInput>div>div>input,
+        .stNumberInput input,
+        .stSelectbox>div>div>div {
+            background: var(--input);
+            color: var(--foreground);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .stTextInput>div>div>input:focus,
+        .stNumberInput input:focus,
+        .stSelectbox>div>div>div:focus-within {
+            border-color: var(--ring);
+            box-shadow: 0 0 0 1px var(--ring);
+        }
+
+        .stDownloadButton>button {
+            background: var(--secondary);
+            color: var(--secondary-foreground);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 12px 20px;
+            font-weight: 600;
+            width: 100%;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .stDownloadButton>button:hover {
+            background: var(--accent);
+            color: var(--accent-foreground);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .block-container {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+
+        .stMarkdown, .stText, .stCaption {
+            color: var(--foreground);
         }
         </style>
     """, unsafe_allow_html=True)
