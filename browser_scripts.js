@@ -352,9 +352,8 @@ global.gatherAnimationInfo = function() {
                 for (var j = 0; j < rules.length; j++) {
                     if (rules[j].type === CSSRule.KEYFRAMES_RULE) {
                         info.animations.push(rules[j].name);
-};
-
-})(typeof window !== 'undefined' ? window : this);
+                    }
+                }
             } catch(e) {
                 // CORS or access issues
             }
