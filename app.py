@@ -40,38 +40,38 @@ def apply_custom_styling():
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Serif:wght@400;600&family=Intel+One+Mono&display=swap');
 
         :root {
-            --background: oklch(1 0 0);
-            --foreground: oklch(0.1450 0 0);
-            --card: oklch(1 0 0);
-            --card-foreground: oklch(0.1450 0 0);
-            --popover: oklch(1 0 0);
-            --popover-foreground: oklch(0.1450 0 0);
-            --primary: oklch(0.2050 0 0);
-            --primary-foreground: oklch(0.9850 0 0);
-            --secondary: oklch(0.9700 0 0);
-            --secondary-foreground: oklch(0.2050 0 0);
-            --muted: oklch(0.9700 0 0);
-            --muted-foreground: oklch(0.5560 0 0);
-            --accent: oklch(0.9700 0 0);
-            --accent-foreground: oklch(0.2050 0 0);
-            --destructive: oklch(0.5770 0.2450 27.3250);
-            --destructive-foreground: oklch(1 0 0);
-            --border: oklch(0.9220 0 0);
-            --input: oklch(0.9220 0 0);
-            --ring: oklch(0.7080 0 0);
-            --chart-1: oklch(0.8100 0.1000 252);
-            --chart-2: oklch(0.6200 0.1900 260);
-            --chart-3: oklch(0.5500 0.2200 263);
-            --chart-4: oklch(0.4900 0.2200 264);
-            --chart-5: oklch(0.4200 0.1800 266);
-            --sidebar: oklch(0.9850 0 0);
-            --sidebar-foreground: oklch(0.1450 0 0);
-            --sidebar-primary: oklch(0.2050 0 0);
-            --sidebar-primary-foreground: oklch(0.9850 0 0);
-            --sidebar-accent: oklch(0.9700 0 0);
-            --sidebar-accent-foreground: oklch(0.2050 0 0);
-            --sidebar-border: oklch(0.9220 0 0);
-            --sidebar-ring: oklch(0.7080 0 0);
+            --background: rgb(255, 255, 255);
+            --foreground: rgb(10, 10, 10);
+            --card: rgb(255, 255, 255);
+            --card-foreground: rgb(10, 10, 10);
+            --popover: rgb(255, 255, 255);
+            --popover-foreground: rgb(10, 10, 10);
+            --primary: rgb(23, 23, 23);
+            --primary-foreground: rgb(250, 250, 250);
+            --secondary: rgb(245, 245, 245);
+            --secondary-foreground: rgb(23, 23, 23);
+            --muted: rgb(245, 245, 245);
+            --muted-foreground: rgb(115, 115, 115);
+            --accent: rgb(245, 245, 245);
+            --accent-foreground: rgb(23, 23, 23);
+            --destructive: rgb(231, 0, 11);
+            --destructive-foreground: rgb(255, 255, 255);
+            --border: rgb(229, 229, 229);
+            --input: rgb(229, 229, 229);
+            --ring: rgb(161, 161, 161);
+            --chart-1: rgb(145, 197, 255);
+            --chart-2: rgb(58, 129, 246);
+            --chart-3: rgb(37, 99, 239);
+            --chart-4: rgb(26, 78, 218);
+            --chart-5: rgb(31, 63, 173);
+            --sidebar: rgb(250, 250, 250);
+            --sidebar-foreground: rgb(10, 10, 10);
+            --sidebar-primary: rgb(23, 23, 23);
+            --sidebar-primary-foreground: rgb(250, 250, 250);
+            --sidebar-accent: rgb(245, 245, 245);
+            --sidebar-accent-foreground: rgb(23, 23, 23);
+            --sidebar-border: rgb(229, 229, 229);
+            --sidebar-ring: rgb(161, 161, 161);
             --font-sans: Inter, ui-sans-serif, sans-serif, system-ui;
             --font-serif: "IBM Plex Serif", ui-serif, serif;
             --font-mono: "Intel One Mono", ui-monospace, monospace;
@@ -87,38 +87,38 @@ def apply_custom_styling():
         }
 
         .dark {
-            --background: oklch(0.1450 0 0);
-            --foreground: oklch(0.9850 0 0);
-            --card: oklch(0.2050 0 0);
-            --card-foreground: oklch(0.9850 0 0);
-            --popover: oklch(0.2690 0 0);
-            --popover-foreground: oklch(0.9850 0 0);
-            --primary: oklch(0.9220 0 0);
-            --primary-foreground: oklch(0.2050 0 0);
-            --secondary: oklch(0.2690 0 0);
-            --secondary-foreground: oklch(0.9850 0 0);
-            --muted: oklch(0.2690 0 0);
-            --muted-foreground: oklch(0.7080 0 0);
-            --accent: oklch(0.3710 0 0);
-            --accent-foreground: oklch(0.9850 0 0);
-            --destructive: oklch(0.7040 0.1910 22.2160);
-            --destructive-foreground: oklch(0.9850 0 0);
-            --border: oklch(0.2750 0 0);
-            --input: oklch(0.3250 0 0);
-            --ring: oklch(0.5560 0 0);
-            --chart-1: oklch(0.7090 0.0100 56.2590);
-            --chart-2: oklch(0.5530 0.0130 58.0710);
-            --chart-3: oklch(0.4440 0.0110 73.6390);
-            --chart-4: oklch(0.3740 0.0100 67.5580);
-            --chart-5: oklch(0.2680 0.0070 34.2980);
-            --sidebar: oklch(0.2050 0 0);
-            --sidebar-foreground: oklch(0.9850 0 0);
-            --sidebar-primary: oklch(0.3740 0.0100 67.5580);
-            --sidebar-primary-foreground: oklch(0.9850 0 0);
-            --sidebar-accent: oklch(0.2690 0 0);
-            --sidebar-accent-foreground: oklch(0.9850 0 0);
-            --sidebar-border: oklch(0.2750 0 0);
-            --sidebar-ring: oklch(0.4390 0 0);
+            --background: rgb(10, 10, 10);
+            --foreground: rgb(250, 250, 250);
+            --card: rgb(23, 23, 23);
+            --card-foreground: rgb(250, 250, 250);
+            --popover: rgb(38, 38, 38);
+            --popover-foreground: rgb(250, 250, 250);
+            --primary: rgb(229, 229, 229);
+            --primary-foreground: rgb(23, 23, 23);
+            --secondary: rgb(38, 38, 38);
+            --secondary-foreground: rgb(250, 250, 250);
+            --muted: rgb(38, 38, 38);
+            --muted-foreground: rgb(161, 161, 161);
+            --accent: rgb(64, 64, 64);
+            --accent-foreground: rgb(250, 250, 250);
+            --destructive: rgb(255, 100, 103);
+            --destructive-foreground: rgb(250, 250, 250);
+            --border: rgb(40, 40, 40);
+            --input: rgb(52, 52, 52);
+            --ring: rgb(115, 115, 115);
+            --chart-1: rgb(166, 160, 155);
+            --chart-2: rgb(121, 113, 107);
+            --chart-3: rgb(87, 83, 77);
+            --chart-4: rgb(68, 64, 59);
+            --chart-5: rgb(41, 37, 36);
+            --sidebar: rgb(23, 23, 23);
+            --sidebar-foreground: rgb(250, 250, 250);
+            --sidebar-primary: rgb(68, 64, 59);
+            --sidebar-primary-foreground: rgb(250, 250, 250);
+            --sidebar-accent: rgb(38, 38, 38);
+            --sidebar-accent-foreground: rgb(250, 250, 250);
+            --sidebar-border: rgb(40, 40, 40);
+            --sidebar-ring: rgb(82, 82, 82);
         }
 
         @theme inline {
@@ -162,6 +162,18 @@ def apply_custom_styling():
             background: var(--background);
             color: var(--foreground);
             font-family: var(--font-sans);
+        }
+
+        .stApp > div[data-testid="stAppViewContainer"] {
+            background: var(--background);
+        }
+
+        main[data-testid="stMain"] {
+            background: var(--background);
+        }
+
+        main[data-testid="stMain"] .block-container {
+            background: var(--background);
         }
 
         header[data-testid="stHeader"] {
@@ -355,6 +367,11 @@ def apply_custom_styling():
         }
         </style>
     """, unsafe_allow_html=True)
+
+    st.markdown(
+        "<script>document.body.classList.add('dark');</script>",
+        unsafe_allow_html=True
+    )
 
 
 def analyze_uploaded_html_from_path(zip_path: str) -> tuple:
