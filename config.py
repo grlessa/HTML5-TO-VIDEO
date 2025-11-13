@@ -80,13 +80,14 @@ FALLBACK_LEVEL: Final[str] = "3.0"
 # ==============================================================================
 
 # Browser binary paths (checked in order)
+# Note: Comet does not support headless mode reliably, so prefer Chrome/Chromium.
 BROWSER_PATHS: Final[list[str]] = [
-    "/Applications/Comet.app/Contents/MacOS/Comet",
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     "/Applications/Chromium.app/Contents/MacOS/Chromium",
     "/usr/bin/chromium",
     "/usr/bin/chromium-browser",
-    "/usr/bin/google-chrome"
+    "/usr/bin/google-chrome",
+    "/Applications/Comet.app/Contents/MacOS/Comet",  # Fallback only
 ]
 
 # Browser timeouts
