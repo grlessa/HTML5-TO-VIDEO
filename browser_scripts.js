@@ -12,13 +12,19 @@
 // BACKGROUND COLOR DETECTION
 // ==============================================================================
 
+(function(global) {
+    if (global.__html5VideoHelpersLoaded) {
+        return;
+    }
+    global.__html5VideoHelpersLoaded = true;
+
 /**
  * Extracts the predominant background color from the page.
  * Checks in order: body background, html background, first content container.
  * 
  * @returns {string} RGB color string (e.g., "rgb(0, 0, 0)")
  */
-function getPredominantBackgroundColor() {
+global.getPredominantBackgroundColor = function() {
     // Try body background color first
     let bodyBg = window.getComputedStyle(document.body).backgroundColor;
     if (bodyBg && bodyBg !== 'rgba(0, 0, 0, 0)' && bodyBg !== 'transparent') {
@@ -42,7 +48,7 @@ function getPredominantBackgroundColor() {
 
     // Default to black
     return 'rgb(0, 0, 0)';
-}
+};
 
 
 // ==============================================================================
@@ -68,7 +74,7 @@ function getPredominantBackgroundColor() {
  * @param {number} padY - Vertical padding offset for centering
  * @param {string} bgColor - Background color for padding areas
  */
-function applyProportionalScaling(
+global.applyProportionalScaling = function(
     targetWidth,
     targetHeight,
     sourceWidth,
@@ -149,7 +155,7 @@ function applyProportionalScaling(
     console.log('Viewport forced to:', targetWidth + 'x' + targetHeight);
     console.log('Wrapper position: absolute, left:' + padX + 'px, top:' + padY + 'px');
     console.log('Transform: scale(' + scaleFactor + ') from top-left');
-}
+};
 
 
 // ==============================================================================
@@ -166,7 +172,7 @@ function applyProportionalScaling(
  * 4. Simulates user interactions (hover, click)
  * 5. Starts any embedded videos
  */
-function triggerAnimations() {
+global.triggerAnimations = function() {
     console.log('Triggering animations...');
 
     // Force all CSS animations to run
@@ -232,7 +238,7 @@ function triggerAnimations() {
     for (var i = 0; i < canvases.length; i++) {
         console.log('Canvas ' + i + ': ' + canvases[i].width + 'x' + canvases[i].height);
     }
-}
+};
 
 
 /**
@@ -241,7 +247,7 @@ function triggerAnimations() {
  * 
  * @returns {number} Count of animations paused
  */
-function pauseAnimationsForControl() {
+global.pauseAnimationsForControl = function() {
     // Store all CSS animations using Web Animations API
     window.__animationElements = [];
 
@@ -262,7 +268,7 @@ function pauseAnimationsForControl() {
     window.__animationStartTime = performance.now();
     
     return window.__animationElements ? window.__animationElements.length : 0;
-}
+};
 
 
 /**
@@ -276,7 +282,7 @@ function pauseAnimationsForControl() {
  * 
  * @param {number} elapsedMs - Elapsed time in milliseconds
  */
-function setAnimationTime(elapsedMs) {
+global.setAnimationTime = function(elapsedMs) {
     var elapsedSeconds = elapsedMs / 1000.0;
 
     // Update all paused CSS animations to exact time
@@ -319,7 +325,7 @@ function setAnimationTime(elapsedMs) {
 
     // Force reflow to ensure all changes take effect
     document.body.offsetHeight;
-}
+};
 
 
 // ==============================================================================
@@ -331,7 +337,7 @@ function setAnimationTime(elapsedMs) {
  * 
  * @returns {Object} Object with animation counts and details
  */
-function gatherAnimationInfo() {
+global.gatherAnimationInfo = function() {
     var info = {
         stylesheets: document.styleSheets.length,
         animations: []
@@ -346,8 +352,9 @@ function gatherAnimationInfo() {
                 for (var j = 0; j < rules.length; j++) {
                     if (rules[j].type === CSSRule.KEYFRAMES_RULE) {
                         info.animations.push(rules[j].name);
-                    }
-                }
+};
+
+})(typeof window !== 'undefined' ? window : this);
             } catch(e) {
                 // CORS or access issues
             }
@@ -365,5 +372,6 @@ function gatherAnimationInfo() {
     }
 
     return info;
-}
+};
 
+})(typeof window !== 'undefined' ? window : this);
