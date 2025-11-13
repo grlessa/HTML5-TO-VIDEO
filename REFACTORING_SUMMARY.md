@@ -2,7 +2,7 @@
 
 ## Overview
 
-The HTML5 to Video Converter has been comprehensively refactored for clarity, performance, and maintainability. The monolithic 1800-line `app.py` has been split into focused, well-documented modules.
+Claude Animator has been comprehensively refactored for clarity, performance, and maintainability. The monolithic 1800-line `app.py` has been split into focused, well-documented modules.
 
 ## New Module Structure
 

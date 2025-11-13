@@ -1,4 +1,4 @@
-# HTML5 to Video Converter
+# Claude Animator
 
 Convert HTML5 ads and animations to video files. Simple web interface, automatic settings detection.
 

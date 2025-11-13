@@ -1,4 +1,4 @@
-# HTML5 to Video Converter - Project Knowledge Guide
+# Claude Animator - Project Knowledge Guide
 
 ## Project Overview
 

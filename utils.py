@@ -1,5 +1,5 @@
 """
-Common utilities for HTML5 to Video Converter.
+Common utilities for Claude Animator.
 """
 import os
 import datetime

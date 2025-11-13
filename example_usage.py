@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Example usage of the refactored HTML5 to Video Converter API.
+Example usage of the refactored Claude Animator API.
 
 This demonstrates how to use the converter programmatically without the Streamlit UI.
 """
@@ -198,7 +198,7 @@ def main():
     Run all examples.
     """
     print("╔════════════════════════════════════════════════════════════╗")
-    print("║  HTML5 to Video Converter - Refactored API Examples       ║")
+    print("║        Claude Animator - Refactored API Examples          ║")
     print("╚════════════════════════════════════════════════════════════╝")
     
     # Run examples

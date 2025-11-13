@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-HTML5 to Video Converter - Streamlit Web Application
+Claude Animator - Streamlit Web Application
 
 Converts HTML5 animations and banner ads to video files with automatic
 parameter detection and social media format conversion.
@@ -517,7 +517,7 @@ def main():
     
     # Page configuration
     st.set_page_config(
-        page_title="HTML5 to Video Converter",
+        page_title="Claude Animator",
         page_icon="🎥",
         layout="wide",
         initial_sidebar_state="expanded"
@@ -527,7 +527,7 @@ def main():
     apply_custom_styling()
     
     # Header
-    st.markdown('<h1 class="main-title">HTML5 to Video Converter</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-title">Claude Animator</h1>', unsafe_allow_html=True)
     
     # Two-column layout
     left_col, right_col = st.columns([2, 1])

@@ -1,5 +1,5 @@
 """
-Configuration and constants for HTML5 to Video Converter
+Configuration and constants for Claude Animator
 """
 from dataclasses import dataclass
 from typing import Final
