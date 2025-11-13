@@ -40,53 +40,6 @@ def apply_custom_styling():
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Serif:wght@400;600&family=Intel+One+Mono&display=swap');
 
         :root {
-            --background: rgb(255, 255, 255);
-            --foreground: rgb(10, 10, 10);
-            --card: rgb(255, 255, 255);
-            --card-foreground: rgb(10, 10, 10);
-            --popover: rgb(255, 255, 255);
-            --popover-foreground: rgb(10, 10, 10);
-            --primary: rgb(23, 23, 23);
-            --primary-foreground: rgb(250, 250, 250);
-            --secondary: rgb(245, 245, 245);
-            --secondary-foreground: rgb(23, 23, 23);
-            --muted: rgb(245, 245, 245);
-            --muted-foreground: rgb(115, 115, 115);
-            --accent: rgb(245, 245, 245);
-            --accent-foreground: rgb(23, 23, 23);
-            --destructive: rgb(231, 0, 11);
-            --destructive-foreground: rgb(255, 255, 255);
-            --border: rgb(229, 229, 229);
-            --input: rgb(229, 229, 229);
-            --ring: rgb(161, 161, 161);
-            --chart-1: rgb(145, 197, 255);
-            --chart-2: rgb(58, 129, 246);
-            --chart-3: rgb(37, 99, 239);
-            --chart-4: rgb(26, 78, 218);
-            --chart-5: rgb(31, 63, 173);
-            --sidebar: rgb(250, 250, 250);
-            --sidebar-foreground: rgb(10, 10, 10);
-            --sidebar-primary: rgb(23, 23, 23);
-            --sidebar-primary-foreground: rgb(250, 250, 250);
-            --sidebar-accent: rgb(245, 245, 245);
-            --sidebar-accent-foreground: rgb(23, 23, 23);
-            --sidebar-border: rgb(229, 229, 229);
-            --sidebar-ring: rgb(161, 161, 161);
-            --font-sans: Inter, ui-sans-serif, sans-serif, system-ui;
-            --font-serif: "IBM Plex Serif", ui-serif, serif;
-            --font-mono: "Intel One Mono", ui-monospace, monospace;
-            --radius: 0.625rem;
-            --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-            --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-            --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
-            --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
-            --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 2px 4px -1px hsl(0 0% 0% / 0.10);
-            --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
-            --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
-            --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
-        }
-
-        .dark {
             --background: rgb(10, 10, 10);
             --foreground: rgb(250, 250, 250);
             --card: rgb(23, 23, 23);
@@ -119,6 +72,53 @@ def apply_custom_styling():
             --sidebar-accent-foreground: rgb(250, 250, 250);
             --sidebar-border: rgb(40, 40, 40);
             --sidebar-ring: rgb(82, 82, 82);
+            --font-sans: Inter, ui-sans-serif, sans-serif, system-ui;
+            --font-serif: "IBM Plex Serif", ui-serif, serif;
+            --font-mono: "Intel One Mono", ui-monospace, monospace;
+            --radius: 0.625rem;
+            --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+            --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+            --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
+            --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
+            --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 2px 4px -1px hsl(0 0% 0% / 0.10);
+            --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
+            --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
+            --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+        }
+
+        body.theme-light {
+            --background: rgb(255, 255, 255);
+            --foreground: rgb(10, 10, 10);
+            --card: rgb(255, 255, 255);
+            --card-foreground: rgb(10, 10, 10);
+            --popover: rgb(255, 255, 255);
+            --popover-foreground: rgb(10, 10, 10);
+            --primary: rgb(23, 23, 23);
+            --primary-foreground: rgb(250, 250, 250);
+            --secondary: rgb(245, 245, 245);
+            --secondary-foreground: rgb(23, 23, 23);
+            --muted: rgb(245, 245, 245);
+            --muted-foreground: rgb(115, 115, 115);
+            --accent: rgb(245, 245, 245);
+            --accent-foreground: rgb(23, 23, 23);
+            --destructive: rgb(231, 0, 11);
+            --destructive-foreground: rgb(255, 255, 255);
+            --border: rgb(229, 229, 229);
+            --input: rgb(229, 229, 229);
+            --ring: rgb(161, 161, 161);
+            --chart-1: rgb(145, 197, 255);
+            --chart-2: rgb(58, 129, 246);
+            --chart-3: rgb(37, 99, 239);
+            --chart-4: rgb(26, 78, 218);
+            --chart-5: rgb(31, 63, 173);
+            --sidebar: rgb(250, 250, 250);
+            --sidebar-foreground: rgb(10, 10, 10);
+            --sidebar-primary: rgb(23, 23, 23);
+            --sidebar-primary-foreground: rgb(250, 250, 250);
+            --sidebar-accent: rgb(245, 245, 245);
+            --sidebar-accent-foreground: rgb(23, 23, 23);
+            --sidebar-border: rgb(229, 229, 229);
+            --sidebar-ring: rgb(161, 161, 161);
         }
 
         @theme inline {
