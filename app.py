@@ -37,6 +37,8 @@ def apply_custom_styling():
     """Apply custom CSS styling to Streamlit app."""
     st.markdown("""
         <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Serif:wght@400;600&family=Intel+One+Mono&display=swap');
+
         :root {
             --background: oklch(1 0 0);
             --foreground: oklch(0.1450 0 0);
@@ -119,10 +121,53 @@ def apply_custom_styling():
             --sidebar-ring: oklch(0.4390 0 0);
         }
 
-        .stApp {
+        @theme inline {
+            --color-background: var(--background);
+            --color-foreground: var(--foreground);
+            --color-card: var(--card);
+            --color-card-foreground: var(--card-foreground);
+            --color-popover: var(--popover);
+            --color-popover-foreground: var(--popover-foreground);
+            --color-primary: var(--primary);
+            --color-primary-foreground: var(--primary-foreground);
+            --color-secondary: var(--secondary);
+            --color-secondary-foreground: var(--secondary-foreground);
+            --color-muted: var(--muted);
+            --color-muted-foreground: var(--muted-foreground);
+            --color-accent: var(--accent);
+            --color-accent-foreground: var(--accent-foreground);
+            --color-destructive: var(--destructive);
+            --color-destructive-foreground: var(--destructive-foreground);
+            --color-border: var(--border);
+            --color-input: var(--input);
+            --color-ring: var(--ring);
+            --color-sidebar: var(--sidebar);
+            --color-sidebar-foreground: var(--sidebar-foreground);
+            --color-sidebar-primary: var(--sidebar-primary);
+            --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+            --color-sidebar-accent: var(--sidebar-accent);
+            --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+            --color-sidebar-border: var(--sidebar-border);
+            --color-sidebar-ring: var(--sidebar-ring);
+            --font-sans: var(--font-sans);
+            --font-mono: var(--font-mono);
+            --font-serif: var(--font-serif);
+            --radius-sm: calc(var(--radius) - 4px);
+            --radius-md: calc(var(--radius) - 2px);
+            --radius-lg: var(--radius);
+            --radius-xl: calc(var(--radius) + 4px);
+        }
+
+        body, .stApp {
             background: var(--background);
             color: var(--foreground);
             font-family: var(--font-sans);
+        }
+
+        header[data-testid="stHeader"] {
+            background: var(--sidebar);
+            color: var(--sidebar-foreground);
+            border-bottom: 1px solid var(--border);
         }
 
         h1, h2, h3, h4 {
@@ -144,6 +189,34 @@ def apply_custom_styling():
             border-radius: var(--radius);
             padding: 20px;
             box-shadow: var(--shadow);
+        }
+
+        div[data-testid="stFileUploaderDropzone"] {
+            background: var(--card);
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        div[data-testid="stFileUploaderDropzone"]:hover {
+            border-color: var(--ring);
+            box-shadow: 0 0 0 1px var(--ring);
+        }
+
+        div[data-testid="stFileUploaderDropzone"] button {
+            background: var(--primary);
+            color: var(--primary-foreground);
+            border: none;
+        }
+
+        div[data-testid="stFileUploaderDropzone"] button:hover {
+            background: var(--accent);
+            color: var(--accent-foreground);
+        }
+
+        div[data-testid="stFileUploaderUploadingStatus"] span,
+        div[data-testid="stFileUploaderUploadedFile"] {
+            color: var(--foreground);
         }
 
         .stFileUploader label,
@@ -247,6 +320,29 @@ def apply_custom_styling():
             background: var(--accent);
             color: var(--accent-foreground);
             box-shadow: var(--shadow-lg);
+        }
+
+        div[data-testid="stExpander"] {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-xs);
+        }
+
+        div[data-testid="stExpander"] button {
+            color: var(--secondary-foreground) !important;
+        }
+
+        div[data-testid="stVerticalBlock"] > div {
+            background: transparent;
+        }
+
+        div[data-testid="stMarkdownContainer"] strong {
+            color: var(--foreground);
+        }
+
+        div[data-testid="stMetricValue"] {
+            font-family: var(--font-serif);
         }
 
         .block-container {
