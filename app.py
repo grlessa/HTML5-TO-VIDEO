@@ -365,6 +365,47 @@ def apply_custom_styling():
         .stMarkdown, .stText, .stCaption {
             color: var(--foreground);
         }
+
+        a, a:visited {
+            color: var(--primary-foreground);
+            text-decoration: none;
+        }
+
+        a:hover {
+            color: var(--primary);
+        }
+
+        div[data-testid="stCheckbox"] label,
+        div[data-testid="stRadio"] label {
+            color: var(--foreground) !important;
+        }
+
+        div[data-testid="stCheckbox"] input[type="checkbox"],
+        div[data-testid="stRadio"] input[type="radio"] {
+            accent-color: var(--primary);
+        }
+
+        div[data-testid="stSlider"] [data-baseweb="slider"] {
+            color: var(--foreground);
+        }
+
+        div[data-testid="stSlider"] [data-baseweb="slider"] > div {
+            background: var(--input);
+        }
+
+        div[data-testid="stSlider"] [data-baseweb="slider"] > div > div {
+            background: var(--primary);
+        }
+
+        div[data-testid="stSlider"] [data-baseweb="slider"] div[role="slider"] {
+            background: var(--primary);
+            border: 2px solid var(--primary-foreground);
+        }
+
+        div[data-testid="stProgress"] div[data-testid="stProgressBar"] > div,
+        .stProgress > div > div {
+            background: var(--primary) !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
